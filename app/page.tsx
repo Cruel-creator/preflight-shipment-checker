@@ -21,6 +21,9 @@ export default function Home() {
           <p className="mt-1 text-sm text-muted">Drop in an Excel sheet of many bookings. Every booking gets issues (Red/Amber), fixes, and a carrier recommendation.</p>
         </Link>
       </div>
+      <Link href="/rates" className="card block p-4 text-sm transition hover:shadow-md">
+        <b>🌍 Shipping something else?</b> Get live carrier rates for any parcel between any two addresses worldwide. <span className="text-brand underline">Open live rates →</span>
+      </Link>
       <p className="text-center text-sm">
         <a className="text-brand underline" href="/sample-test-data.xlsx" download>Download a sample file to try</a>
       </p>

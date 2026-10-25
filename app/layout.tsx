@@ -30,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <nav className="flex gap-4 text-sm text-muted">
               <a href="/chat" className="hover:text-fg">Book by chat</a>
               <a href="/upload" className="hover:text-fg">Upload a file</a>
+              <a href="/rates" className="hover:text-fg">Live rates</a>
             </nav>
           </div>
         </header>
