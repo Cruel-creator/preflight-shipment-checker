@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { IssueCard } from '@/components/ResultPanel';
+import { ScanLoader } from '@/components/ScanLoader';
 import { COUNTRY_OPTIONS, profileFor } from '@/lib/countries';
 import type { Issue, PassedCheck } from '@/lib/types';
 import type { LiveRate, RatesResponse } from '@/lib/shippo';
@@ -104,7 +105,7 @@ export default function RatesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">Any shipment — live carrier rates</h1>
+        <h1 className="font-display text-3xl font-bold tracking-tight">Any shipment — live carrier rates</h1>
         <p className="text-sm text-muted">Price a parcel between any two addresses worldwide with live carrier rates from Shippo. Prices and declared values are in the currency of the country you ship from, and checks follow that country&apos;s export rules. This is separate from the UK→EU pallet booking checker, which keeps its own fixed rate card and rulebook. Parcels only (up to 70 kg).</p>
       </div>
 
@@ -147,6 +148,7 @@ export default function RatesPage() {
         <button className="btn btn-primary" disabled={busy}>{busy ? 'Fetching rates…' : 'Get live rates & check'}</button>
       </form>
 
+      {busy && <ScanLoader label="Fetching live carrier rates…" sub="Asking carriers to price your parcel" />}
       {err && <div role="alert" className="tone-red rounded-lg border px-4 py-3 text-sm">⛔ {err}</div>}
 
       {res && status && (

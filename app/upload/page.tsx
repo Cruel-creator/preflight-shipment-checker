@@ -5,6 +5,7 @@ import type { Issue } from '@/lib/types';
 import { money } from '@/lib/format';
 import { ResultPanel } from '@/components/ResultPanel';
 import { StatusBadge } from '@/components/ui';
+import { ScanLoader } from '@/components/ScanLoader';
 
 interface Resp { today: string; results: BookingResult[]; warnings: Issue[]; llmAvailable: boolean; llmConfigured: boolean }
 
@@ -47,11 +48,13 @@ export default function UploadPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">Upload bookings</h1>
+        <h1 className="font-display text-3xl font-bold tracking-tight">Upload bookings</h1>
         <p className="text-sm text-muted">Excel file with a <b>Bookings</b> and an <b>Items</b> sheet, same layout as the template (max 2 MB, 500 bookings). <a className="text-brand underline" href="/sample-test-data.xlsx" download>Download a sample file to try</a>.</p>
       </div>
 
-      {!selected && (
+      {busy && <ScanLoader label="Scanning your bookings…" sub="Running the ten pre-flight rules and matching carriers" />}
+
+      {!selected && !busy && (
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}

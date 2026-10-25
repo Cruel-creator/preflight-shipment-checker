@@ -77,7 +77,7 @@ export default function ChatPage() {
             </div>
           ))}
           {msgs.length === 1 && <button className="btn text-left text-sm" onClick={() => send(EXAMPLE)}>💡 Try: “{EXAMPLE}”</button>}
-          {busy && <div className="text-sm text-muted">Thinking…</div>}
+          {busy && <div className="flex items-center gap-2 text-sm text-muted" role="status"><span className="truckbob">🚚</span> Checking your booking…</div>}
           <div ref={end} />
         </div>
         <form className="flex gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); send(text); }}>
