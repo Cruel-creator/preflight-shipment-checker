@@ -16,7 +16,7 @@ No login. Open the site, then either **Book by chat** (try the clickable example
 Both flows produce the same `Booking` object and go through the same pipeline (`lib/rules`, `lib/recommend.ts`, `lib/confirm.ts`).
 
 ### Principle: code checks the rules, AI handles language
-All rule results and carrier maths are deterministic TypeScript (`lib/rules`, `lib/recommend.ts`). The Anthropic API (server routes only; key never reaches the browser) is used only to: extract fields from chat, write friendly replies, flag dangerous goods from free text as a backstop, and *suggest* HS codes (always labelled "Suggested — please confirm"). In chat the reply writer is given the engine's results and told not to contradict them. If the API is down or unconfigured, uploads still work completely (keyword-only dangerous goods, no HS suggestions) and chat shows an "assistant unavailable" banner.
+All rule results and carrier maths are deterministic TypeScript (`lib/rules`, `lib/recommend.ts`). The Gemini API (server routes only; key never reaches the browser) is used only to: extract fields from chat, write friendly replies, flag dangerous goods from free text as a backstop, and *suggest* HS codes (always labelled "Suggested — please confirm"). In chat the reply writer is given the engine's results and told not to contradict them. If the API is down or unconfigured, uploads still work completely (keyword-only dangerous goods, no HS suggestions) and chat shows an "assistant unavailable" banner.
 
 ## Judgement calls (and why)
 - **R-05 is evaluated against the recommended carrier.** The rule says weight per pallet must not exceed *the chosen carrier's* limit. If the seller's priority would pick a carrier the weight rules out (e.g. Fastest → Carrier C at 450 kg/pallet, limit 400), we don't raise a Red; we show an Info note and recommend the best feasible carrier instead (B). A Red is raised only if *no* carrier can take it (> 750 kg/pallet), with the minimum pallets needed and what would unlock A (÷500) and C (÷400).
@@ -32,19 +32,19 @@ All rule results and carrier maths are deterministic TypeScript (`lib/rules`, `l
 
 ## Known limitations
 - CSV upload is not supported (a booking needs two sheets); `.xlsx` only.
-- Chat needs `ANTHROPIC_API_KEY`; without it chat cannot read messages (upload is unaffected).
+- Chat needs `GEMINI_API_KEY`; without it chat cannot read messages (upload is unaffected).
 - Rate limiting is in-memory per server instance, so it's best-effort on serverless.
 - Customs paperwork and the invoice "To complete" fields are advisory guidance, outside the scored rulebook.
 - Supabase share links (`/result/[id]`) are not implemented; everything works without Supabase.
 
 ## Run it
 ```bash
-cp .env.example .env.local   # add ANTHROPIC_API_KEY
+cp .env.example .env.local   # add GEMINI_API_KEY
 npm install
 npm run dev                  # http://localhost:3000
 npm test                     # Vitest: rules, recommender, parser, chat merge
 npm run make-sample          # regenerates public/sample-test-data.xlsx (dates relative to today)
 ```
-Env: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), `ANTHROPIC_FAST_MODEL` (default `claude-haiku-5-5`).
+Env: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.8-flash`), `GEMINI_FAST_MODEL` (default `gemini-3.5-flash-lite`).
 
 Reference material is in `docs/` (case brief and template workbook).

@@ -6,7 +6,7 @@ import {
 } from '@/lib/chat';
 import { londonToday } from '@/lib/dates';
 import { DESTINATIONS, ORIGIN_CITIES } from '@/lib/data/reference';
-import { getClient, MODEL, reviewItems } from '@/lib/llm';
+import { genJson, genText, llmConfigured, MODEL, reviewItems } from '@/lib/llm';
 import { rateLimit } from '@/lib/ratelimit';
 import type { Booking } from '@/lib/types';
 
@@ -26,10 +26,7 @@ const itemProps = {
   countryOfOrigin: { type: 'string', description: 'Where the product was made' },
 };
 
-const TOOL = {
-  name: 'update_booking',
-  description: 'Record ONLY the booking details the seller stated in their latest message. Omit anything not stated. Never guess or invent values.',
-  input_schema: {
+const SCHEMA = {
     type: 'object' as const,
     properties: {
       sellerName: { type: 'string' },
@@ -55,16 +52,16 @@ const TOOL = {
         },
       },
     },
-  },
 };
 
 function extractionSystem(draft: Booking, today: string) {
   const weekday = new Date(`${today}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
   return `You extract shipment booking details from a seller's chat message for a UK→EU pallet freight service.
 Today's date in London is ${today} (${weekday}).
-You MUST call update_booking exactly once. Include only what the seller stated in their LATEST message; never invent, assume or compute values the seller did not give (except resolving relative dates, and turning relative changes like "add a pallet" into the new absolute number using the current draft).
+Return a JSON object with only what the seller stated in their LATEST message; never invent, assume or compute values the seller did not give (except resolving relative dates, and turning relative changes like "add a pallet" into the new absolute number using the current draft).
 Map loose language to allowed values. A city implies its country. If the seller names an unsupported city, pass it through unchanged so the app can respond.
 If the seller gives a price per unit for an item, put it in unitPrice. "1,080 mugs at £5 each" = one item: description "mugs", quantity 1080, unitPrice 5. Refer to existing items by their sku. If the message changes the quantity of the only item, use op "update".
+Relative changes are resolved against the current draft: "add a pallet" with ${draft.pallets ?? 'no'} pallets recorded means pallets = ${draft.pallets != null ? draft.pallets + 1 : 'unknown (leave out)'}; "make it 4 pallets" means 4; "remove a pallet" means current − 1. Messages like "yes that's right" confirming calculated totals mean confirmDerived = true.
 Current draft (what is already recorded):
 ${JSON.stringify({ ...draft, parseIssues: undefined, derived: undefined })}`;
 }
@@ -79,7 +76,8 @@ Rules:
 - If derivedNotes is non-empty, mention them and ask the seller to confirm.
 - If a Red or Amber issue is new or relevant, explain it in one plain sentence (stated vs calculated) and the simplest fix. Red = must be fixed before shipping; Amber = risky.
 - When complete (missing is empty): give a 2-3 sentence summary: status, recommended carrier, why (use the supplied reason), and total cost. Tell them they can press "Confirm booking" (if status is not Blocked).
-- Warm, concise, plain English. No headings, no tables, minimal markdown.`;
+- Do NOT ask clarifying questions beyond the missing list, and do not comment on country-of-origin wording or other details not in FACTS.
+- Warm, concise, plain English, under 120 words. Plain text only: no headings, no bold, no tables, no bullet lists (a numbered list is fine for questions).`;
 
 export async function POST(req: Request) {
   const rl = rateLimit(req);
@@ -99,27 +97,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Bad request.' }, { status: 400 });
   }
   const today = londonToday();
-  const client = getClient();
+  const client = llmConfigured();
 
   // 1. Extract
   let update: BookingUpdate = {};
   let llmOk = !!client;
   if (client) {
     try {
-      const res = await client.messages.create({
-        model: MODEL,
-        max_tokens: 2000,
-        output_config: { effort: 'low' },
-        system: extractionSystem(draft, today),
-        tools: [TOOL],
-        tool_choice: { type: 'auto' },
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      });
-      const tu = res.content.find((b) => b.type === 'tool_use');
-      if (tu && tu.type === 'tool_use') update = tu.input as BookingUpdate;
+      update = await genJson<BookingUpdate>(MODEL, extractionSystem(draft, today), messages, SCHEMA, 2000);
     } catch (e) {
       console.error('extract failed', e instanceof Error ? e.message : e);
       llmOk = false;
+    }
+  }
+
+  // Deterministic safety net for the most common relative edit ("add a pallet", "remove 2 pallets").
+  const last = messages[messages.length - 1].content.toLowerCase();
+  if (update.pallets == null && draft.pallets != null) {
+    const words: Record<string, number> = { a: 1, an: 1, one: 1, another: 1, two: 2, three: 3, four: 4, five: 5 };
+    const m = last.match(/\b(add|adding|plus|another|extra)\s+(?:an?\s+|one\s+|two\s+|three\s+|four\s+|five\s+|(\d+)\s+)?(?:extra\s+|more\s+|additional\s+)?pallets?\b/) ;
+    const r = last.match(/\b(remove|drop|take off|less)\s+(an?|one|two|three|four|five|\d+)?\s*pallets?\b/);
+    if (m) {
+      const word = m[0].split(/\s+/)[1];
+      const n = m[2] ? Number(m[2]) : words[word] ?? 1;
+      update = { ...update, pallets: draft.pallets + n };
+    } else if (r) {
+      const n = r[2] ? (Number(r[2]) || words[r[2]] || 1) : 1;
+      update = { ...update, pallets: Math.max(1, draft.pallets - n) };
     }
   }
 
@@ -152,21 +156,23 @@ export async function POST(req: Request) {
       supportedDestinations: rejected.some((r) => r.field.startsWith('destination')) ? DESTINATIONS : undefined,
     };
     try {
-      const res = await client.messages.create({
-        model: MODEL,
-        max_tokens: 1200,
-        output_config: { effort: 'low' },
-        system: REPLY_SYSTEM,
-        messages: [
-          ...messages.slice(-6).slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
-          { role: 'user', content: `Seller's message: ${messages[messages.length - 1].content}\n\nFACTS (from code):\n${JSON.stringify(facts)}` },
-        ],
-      });
-      reply = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('\n').trim();
+      reply = await genText(MODEL, REPLY_SYSTEM, [
+        ...messages.slice(-6).slice(0, -1),
+        { role: 'user', content: `Seller's message: ${messages[messages.length - 1].content}\n\nFACTS (from code):\n${JSON.stringify(facts)}` },
+      ]);
     } catch (e) {
       console.error('reply failed', e instanceof Error ? e.message : e);
     }
   }
+  // The model sometimes ignores "plain text only"; the chat bubble renders plain text, so strip markdown.
+  reply = reply
+    .replace(/^\s*[-*_]{3,}\s*$/gm, '')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/^\s*[*-]\s+/gm, '• ')
+    .replace(/^>\s?/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   if (!reply) {
     reply = templateReply({ changes, rejected, missing, result, derivedNotes: dNotes });
   }
