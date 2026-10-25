@@ -64,3 +64,76 @@ export function circleTexture(): THREE.CanvasTexture {
   x.fillStyle = gr; x.beginPath(); x.arc(32, 32, 32, 0, Math.PI * 2); x.fill();
   return new THREE.CanvasTexture(c);
 }
+
+/** Smooth damping from the animation guide (critically damped follow), per axis. */
+export function smoothDamp(current: number, target: number, vel: { v: number }, smoothTime: number, dt: number) {
+  const omega = 2 / smoothTime;
+  const x = omega * dt;
+  const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = current - target;
+  const temp = (vel.v + omega * change) * dt;
+  vel.v = (vel.v - omega * temp) * exp;
+  return target + (change + temp) * exp;
+}
+
+/**
+ * Parcel whose lid opens through a MORPH TARGET. The lid is a flat quad hinged at the back edge;
+ * its single morph target is the same quad rotated open. A NumberKeyframeTrack drives
+ * `.morphTargetInfluences[0]`, a BooleanKeyframeTrack reveals the shipment inside, and an
+ * ADDITIVE "breathe" clip squashes the box on top of whatever else is playing.
+ */
+export function makeOpenParcel(w = 0.22, h = 0.15, d = 0.18) {
+  const holder = new THREE.Group();
+  const parcel = new THREE.Group();
+  parcel.name = 'parcel';
+  holder.add(parcel);
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color: 0xc89b62 }));
+  parcel.add(base);
+  const tape = new THREE.Mesh(new THREE.BoxGeometry(w * 0.16, h * 1.01, d * 1.01), new THREE.MeshLambertMaterial({ color: 0xe9d6ab }));
+  parcel.add(tape);
+
+  const lidGeo = new THREE.PlaneGeometry(w, d, 1, 1);
+  lidGeo.rotateX(-Math.PI / 2);
+  lidGeo.translate(0, 0, d / 2); // hinge at z = 0
+  const open = lidGeo.attributes.position.clone();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < open.count; i++) {
+    v.fromBufferAttribute(open, i).applyAxisAngle(new THREE.Vector3(1, 0, 0), -2.05);
+    open.setXYZ(i, v.x, v.y, v.z);
+  }
+  lidGeo.morphAttributes.position = [open];
+  const lid = new THREE.Mesh(lidGeo, new THREE.MeshLambertMaterial({ color: 0xd9ad72, side: THREE.DoubleSide }));
+  lid.name = 'lid';
+  lid.position.set(0, h / 2 + 0.001, -d / 2);
+  lid.updateMorphTargets();
+  parcel.add(lid);
+
+  const item = new THREE.Mesh(new THREE.OctahedronGeometry(Math.min(w, d) * 0.22), new THREE.MeshBasicMaterial({ color: 0xff6a1a }));
+  item.name = 'item';
+  item.position.set(0, h / 2 + 0.03, 0);
+  item.visible = false;
+  parcel.add(item);
+
+  const lidClip = new THREE.AnimationClip('open-lid', 4.4, [
+    new THREE.NumberKeyframeTrack('lid.morphTargetInfluences[0]', [0, 0.9, 1.4, 3.0, 3.6, 4.4], [0, 0, 1, 1, 0, 0]),
+    new THREE.BooleanKeyframeTrack('item.visible', [0, 1.3, 3.1], [false, true, false]),
+    new THREE.VectorKeyframeTrack('item.position', [1.3, 2.1, 3.0], [0, h / 2 + 0.01, 0, 0, h / 2 + 0.09, 0, 0, h / 2 + 0.01, 0]),
+  ]);
+  lidClip.tracks[0].setInterpolation(THREE.InterpolateSmooth);
+  lidClip.optimize();
+
+  const breathe = new THREE.AnimationClip('breathe', 2, [
+    new THREE.VectorKeyframeTrack('.scale', [0, 1, 2], [1, 1, 1, 1.05, 0.95, 1.05, 1, 1, 1]),
+  ]);
+  THREE.AnimationUtils.makeClipAdditive(breathe);
+
+  const mixer = new THREE.AnimationMixer(parcel);
+  const lidAction = mixer.clipAction(lidClip);
+  lidAction.play();
+  const breatheAction = mixer.clipAction(breathe);
+  breatheAction.blendMode = THREE.AdditiveAnimationBlendMode;
+  breatheAction.play();
+
+  return { holder, parcel, mixer, lidAction, breatheAction };
+}

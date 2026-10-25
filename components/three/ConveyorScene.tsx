@@ -65,6 +65,62 @@ export default function ConveyorScene({ className = '' }: { className?: string }
     arch.add(laser);
     scene.add(arch);
 
+    // dock crane: a SkinnedMesh on a 3-bone skeleton (shoulder → elbow → wrist), driven by an AnimationClip
+    const armLen = 1.5;
+    const armGeo = new THREE.CylinderGeometry(0.07, 0.07, armLen, 10, 20);
+    armGeo.translate(0, armLen / 2, 0);
+    const pos = armGeo.attributes.position;
+    const skinIndex: number[] = [], skinWeight: number[] = [];
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      const w1 = THREE.MathUtils.clamp((y - 0.5) / 0.4, 0, 1);
+      const w2 = THREE.MathUtils.clamp((y - 1.05) / 0.3, 0, 1);
+      const b0 = 1 - w1, b1 = w1 * (1 - w2), b2 = w2;
+      skinIndex.push(0, 1, 2, 0);
+      skinWeight.push(b0, b1, b2, 0);
+    }
+    armGeo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndex, 4));
+    armGeo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeight, 4));
+    const shoulder = new THREE.Bone(); shoulder.name = 'shoulder';
+    const elbow = new THREE.Bone(); elbow.name = 'elbow'; elbow.position.y = 0.75;
+    const wrist = new THREE.Bone(); wrist.name = 'wrist'; wrist.position.y = 0.65;
+    shoulder.add(elbow); elbow.add(wrist);
+    const armMesh = new THREE.SkinnedMesh(armGeo, new THREE.MeshLambertMaterial({ color: 0xff6a1a }));
+    armMesh.add(shoulder);
+    armMesh.bind(new THREE.Skeleton([shoulder, elbow, wrist]));
+    const crane = new THREE.Group();
+    crane.position.set(2.5, 0, -1.25);
+    const baseMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.18, 16), new THREE.MeshLambertMaterial({ color: 0x12284c }));
+    baseMesh.position.y = 0.09;
+    crane.add(baseMesh, armMesh);
+    armMesh.position.y = 0.18;
+    const claw = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.34), new THREE.MeshLambertMaterial({ color: 0xdfe6f3 }));
+    claw.position.y = 0.1;
+    wrist.add(claw);
+    const cargo = makeParcel(0.45, 0.32, 0.4, false);
+    cargo.name = 'cargo';
+    cargo.position.y = -0.12;
+    cargo.visible = false;
+    claw.add(cargo);
+    scene.add(crane);
+
+    const rz = (a: number) => { const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a); return [q.x, q.y, q.z, q.w]; };
+    const rx = (a: number) => { const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), a); return [q.x, q.y, q.z, q.w]; };
+    const T = [0, 0.9, 1.5, 2.4, 3.2, 4.2, 5];
+    const craneClip = new THREE.AnimationClip('sort', 5, [
+      // swing across the belt (y), reach (x), fold elbow, release over the dock cage
+      new THREE.QuaternionKeyframeTrack('shoulder.quaternion', T, [...rx(0.2), ...rx(1.0), ...rx(1.0), ...rx(0.2), ...rx(-0.35), ...rx(-0.35), ...rx(0.2)]),
+      new THREE.QuaternionKeyframeTrack('elbow.quaternion', T, [...rz(0), ...rz(0.3), ...rz(0.3), ...rz(-0.2), ...rz(-0.5), ...rz(-0.1), ...rz(0)]),
+      new THREE.QuaternionKeyframeTrack('wrist.quaternion', T, [...rx(0), ...rx(-0.5), ...rx(-0.5), ...rx(0.2), ...rx(0.5), ...rx(0.1), ...rx(0)]),
+      new THREE.BooleanKeyframeTrack('cargo.visible', [0, 1.2, 3.8], [false, true, false]),
+    ]);
+    craneClip.tracks.forEach((t) => t.name.includes('quaternion') && t.setInterpolation(THREE.InterpolateSmooth));
+    const craneMixer = new THREE.AnimationMixer(crane);
+    const craneAction = craneMixer.clipAction(craneClip);
+    craneAction.play();
+    // each time the crane cycle restarts, give the scanner a flash — mixer events from the animation guide
+    craneMixer.addEventListener('loop', () => { flash = 1; });
+
     // parcels
     const sizes: [number, number, number][] = [[0.7, 0.5, 0.55], [0.5, 0.42, 0.5], [0.85, 0.55, 0.6], [0.55, 0.7, 0.5], [0.7, 0.45, 0.55]];
     const parcels = sizes.map(([w, h, d], i) => {
@@ -87,9 +143,10 @@ export default function ConveyorScene({ className = '' }: { className?: string }
     ro.observe(el);
     resize();
 
+    let flash = 0;
     const place = () => parcels.forEach((p) => { p.g.position.set(p.x, p.h / 2, 0); p.g.scale.setScalar(p.base + p.pop.position * 0.12); });
     const clock = new THREE.Clock();
-    let raf = 0, visible = true, flash = 0;
+    let raf = 0, visible = true;
     const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; });
     io.observe(el);
     const frame = () => {
@@ -104,15 +161,16 @@ export default function ConveyorScene({ className = '' }: { className?: string }
         p.pop.update(dt);
       });
       flash = Math.max(0, flash - dt * 2.2);
+      craneMixer.update(dt);
       laserMat.opacity = 0.3 + 0.25 * Math.sin(t * 9) ** 2 + flash * 0.4;
       laser.scale.y = 1 + flash * 0.15;
       place();
       renderer.render(scene, camera);
     };
-    if (reduced) { place(); renderer.render(scene, camera); } else frame();
+    if (reduced) { place(); craneMixer.update(1.6); renderer.render(scene, camera); } else frame();
 
     return () => {
-      cancelAnimationFrame(raf); ro.disconnect(); io.disconnect();
+      cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); craneMixer.stopAllAction();
       disposeScene(scene); beltTex.dispose(); renderer.dispose(); renderer.domElement.remove();
     };
   }, []);

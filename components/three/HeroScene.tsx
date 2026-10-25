@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import land from '@/lib/data/landDots.json';
-import { circleTexture, disposeScene, makeParcel, prefersReducedMotion, Spring } from './shared';
+import { circleTexture, disposeScene, makeOpenParcel, prefersReducedMotion, smoothDamp, Spring } from './shared';
 
 const ll = (lat: number, lon: number, r = 1) => {
   const p = (lat * Math.PI) / 180, l = (lon * Math.PI) / 180;
@@ -38,19 +38,91 @@ function place(o: THREE.Object3D, c: THREE.CatmullRomCurve3, t: number) {
   o.position.copy(p);
 }
 
-function makeTruck(): THREE.Group {
+/** Rigged truck: named wheels + body so AnimationClips can drive them. */
+function makeTruck() {
   const g = new THREE.Group();
+  const body = new THREE.Group();
+  body.name = 'body';
+  g.add(body);
   const cargo = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.03, 0.07), new THREE.MeshLambertMaterial({ color: 0xf6f3ea }));
-  cargo.position.set(0, 0.02, -0.014);
+  cargo.position.set(0, 0.026, -0.014);
   const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.0346, 0.008, 0.0702), new THREE.MeshLambertMaterial({ color: 0xff6a1a }));
-  stripe.position.set(0, 0.012, -0.014);
+  stripe.position.set(0, 0.018, -0.014);
   const cab = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.022, 0.024), new THREE.MeshLambertMaterial({ color: 0xff6a1a }));
-  cab.position.set(0, 0.016, 0.037);
+  cab.position.set(0, 0.022, 0.037);
   const glass = new THREE.Mesh(new THREE.BoxGeometry(0.0325, 0.008, 0.008), new THREE.MeshBasicMaterial({ color: 0x9cc7ff }));
-  glass.position.set(0, 0.022, 0.046);
-  g.add(cargo, stripe, cab, glass);
+  glass.position.set(0, 0.028, 0.046);
+  body.add(cargo, stripe, cab, glass);
+  const wheelGeo = new THREE.CylinderGeometry(0.007, 0.007, 0.006, 10);
+  wheelGeo.rotateZ(Math.PI / 2);
+  const wheelMat = new THREE.MeshLambertMaterial({ color: 0x0d1424 });
+  const wheels: THREE.Mesh[] = [];
+  [[-0.018, -0.03], [0.018, -0.03], [-0.018, 0.0], [0.018, 0.0], [-0.017, 0.04], [0.017, 0.04]].forEach(([x, z], i) => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.name = `w${i}`;
+    w.position.set(x, 0.007, z);
+    g.add(w);
+    wheels.push(w);
+  });
   g.scale.setScalar(0.3);
-  return g;
+  return { g, wheels };
+}
+
+/** Wheel-spin + body-bob "drive" clip and a low "idle" rumble clip, blended with crossFadeTo. */
+function truckClips(wheels: THREE.Mesh[]) {
+  const times = [0, 0.125, 0.25, 0.375, 0.5];
+  const spin = wheels.map((w) => {
+    const q = (a: number) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), a);
+    const vals = [0, 1, 2, 3, 4].flatMap((k) => { const e = q((k * Math.PI) / 2); return [e.x, e.y, e.z, e.w]; });
+    return new THREE.QuaternionKeyframeTrack(`${w.name}.quaternion`, times, vals);
+  });
+  const bob = new THREE.VectorKeyframeTrack('body.position', times, [0, 0, 0, 0, 0.0016, 0, 0, 0, 0, 0, 0.0012, 0, 0, 0, 0]);
+  const drive = new THREE.AnimationClip('drive', 0.5, [...spin, bob]);
+  const rumble = new THREE.VectorKeyframeTrack('body.position', [0, 0.15, 0.3, 0.45, 0.6], [0, 0, 0, 0.0004, 0.0005, 0, 0, 0, 0.0003, -0.0004, 0.0003, 0, 0, 0, 0]);
+  const idle = new THREE.AnimationClip('idle', 0.6, [rumble]);
+  drive.optimize();
+  return { drive, idle };
+}
+
+class Truck {
+  g: THREE.Group;
+  mixer: THREE.AnimationMixer;
+  drive: THREE.AnimationAction;
+  idle: THREE.AnimationAction;
+  state: 'drive' | 'dock' = 'drive';
+  hold = 0;
+  constructor(public curve: THREE.CatmullRomCurve3, public t: number, public speed: number) {
+    const { g, wheels } = makeTruck();
+    this.g = g;
+    const { drive, idle } = truckClips(wheels);
+    this.mixer = new THREE.AnimationMixer(g);
+    this.drive = this.mixer.clipAction(drive);
+    this.idle = this.mixer.clipAction(idle);
+    this.drive.play();
+    this.idle.play();
+    this.idle.setEffectiveWeight(0);
+  }
+  update(dt: number) {
+    if (this.state === 'drive') {
+      this.t += this.speed * dt;
+      this.drive.timeScale = 1 + this.speed * 8;
+      if (this.t >= 0.985) {
+        this.t = 0.985;
+        this.state = 'dock';
+        this.hold = 1.4 + Math.random() * 0.8;
+        this.drive.crossFadeTo(this.idle.reset().play(), 0.35, false); // unload at the destination
+      }
+    } else {
+      this.hold -= dt;
+      if (this.hold <= 0) {
+        this.t = 0.01;
+        this.state = 'drive';
+        this.idle.crossFadeTo(this.drive.reset().play(), 0.35, false);
+      }
+    }
+    place(this.g, this.curve, this.t);
+    this.mixer.update(dt);
+  }
 }
 
 function makePlane(): THREE.Group {
@@ -71,7 +143,7 @@ function makePlane(): THREE.Group {
   return g;
 }
 
-export default function HeroScene({ className = '' }: { className?: string }) {
+export default function HeroScene({ className = '', framing = 'banner' }: { className?: string; framing?: 'banner' | 'tile' }) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,6 +156,7 @@ export default function HeroScene({ className = '' }: { className?: string }) {
       return; // no WebGL: the CSS gradient behind stays as the fallback
     }
     const reduced = prefersReducedMotion();
+    const tile = framing === 'tile';
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1.5 : 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
@@ -154,6 +227,7 @@ export default function HeroScene({ className = '' }: { className?: string }) {
     type Mover = { obj: THREE.Object3D; curve: THREE.CatmullRomCurve3; speed: number; t: number };
     const movers: Mover[] = [];
     const packets: Mover[] = [];
+    const trucks: Truck[] = [];
     let planeCurve: THREE.CatmullRomCurve3 | null = null;
     let plane: THREE.Group | null = null;
     const trailN = 44;
@@ -168,12 +242,9 @@ export default function HeroScene({ className = '' }: { className?: string }) {
       const geo = new THREE.TubeGeometry(curve, 80, kind === 'air' ? 0.0011 : 0.0016, 6, false);
       globe.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: kind === 'air' ? 0xcfe0ff : 0xff6a1a, transparent: true, opacity: kind === 'air' ? 0.5 : 0.7 })));
       if (kind === 'road') {
-        const n = 1;
-        for (let k = 0; k < n; k++) {
-          const t = makeTruck();
-          globe.add(t);
-          movers.push({ obj: t, curve, speed: 0.045 + (i % 3) * 0.008, t: (k / n + i * 0.17) % 1 });
-        }
+        const tr = new Truck(curve, (i * 0.17) % 0.9, 0.045 + (i % 3) * 0.008);
+        globe.add(tr.g);
+        trucks.push(tr);
       } else {
         planeCurve = curve;
         plane = makePlane();
@@ -187,25 +258,29 @@ export default function HeroScene({ className = '' }: { className?: string }) {
     });
     let planeT = 0;
 
-    // floating parcels animated with AnimationMixer + keyframe tracks
-    const floaters: { g: THREE.Group; mixer: THREE.AnimationMixer }[] = [];
-    const spots: [number, number, number, number][] = [[0.3, 0.14, 1.3, 0], [0.22, -0.15, 1.35, 1.3]];
-    spots.forEach(([x, y, z, phase], i) => {
-      const p = makeParcel(0.2 - i * 0.025, 0.14, 0.16);
-      p.scale.setScalar(0.26);
-      scene.add(p);
+    // floating parcels: float clip (holder) + lid MORPH target + ADDITIVE breathing (parcel), mixer events
+    const floaters: { mixer: THREE.AnimationMixer; float: THREE.AnimationMixer; pop: Spring; holder: THREE.Group; base: number }[] = [];
+    const spots: [number, number, number, number, number][] = tile
+      ? [[0.24, 0.2, 1.3, 0, 0.3], [0.08, -0.3, 1.35, 2.2, 0.26]]
+      : [[0.3, 0.14, 1.3, 0, 0.26], [0.22, -0.15, 1.35, 2.2, 0.22]];
+    spots.forEach(([x, y, z, phase, sc], i) => {
+      const { holder, mixer, lidAction } = makeOpenParcel();
+      holder.scale.setScalar(sc);
+      scene.add(holder);
       const times = [0, 2, 4];
-      const pos = new THREE.VectorKeyframeTrack('.position', times, [x, y, z, x + 0.01, y + 0.03, z, x, y, z]);
+      const pos = new THREE.VectorKeyframeTrack('.position', times, [x, y, z, x + 0.012, y + 0.035, z, x, y, z]);
       pos.setInterpolation(THREE.InterpolateSmooth);
-      const q = (rx: number, ry: number) => new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0.12 * (i + 1)));
-      const qs = [q(0.25, 0.4), q(0.4, 2.2), q(0.25, 0.4 + Math.PI * 2)];
+      const q = (rx: number, ry: number) => new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0.1 * (i + 1)));
+      const qs = [q(0.5, 0.5), q(0.55, 2.4), q(0.5, 0.5 + Math.PI * 2)];
       const rot = new THREE.QuaternionKeyframeTrack('.quaternion', times, qs.flatMap((e) => [e.x, e.y, e.z, e.w]));
-      const clip = new THREE.AnimationClip(`float${i}`, 4, [pos, rot]);
-      const mixer = new THREE.AnimationMixer(p);
-      const action = mixer.clipAction(clip);
-      action.time = phase;
-      action.play();
-      floaters.push({ g: p, mixer });
+      const float = new THREE.AnimationMixer(holder);
+      const fa = float.clipAction(new THREE.AnimationClip(`float${i}`, 4, [pos, rot]));
+      fa.time = phase;
+      fa.play();
+      lidAction.time = phase * 0.6;
+      const pop = new Spring(170, 9);
+      mixer.addEventListener('loop', () => { pop.velocity = 2.4; }); // pop each time the lid cycle restarts
+      floaters.push({ mixer, float, pop, holder, base: sc });
     });
 
     // drifting dust
@@ -220,6 +295,8 @@ export default function HeroScene({ className = '' }: { className?: string }) {
     const lat0 = (51 * Math.PI) / 180, lon0 = (5 * Math.PI) / 180;
     const sx = new Spring(60, 9), sy = new Spring(60, 9);
     let wide = true;
+    const baseCam = new THREE.Vector3(0, 0, 2);
+    const camX = { v: 0 }, camY = { v: 0 };
 
     const resize = () => {
       const w = el.clientWidth || 1, h = el.clientHeight || 1;
@@ -227,10 +304,11 @@ export default function HeroScene({ className = '' }: { className?: string }) {
       camera.aspect = w / h;
       wide = w / h > 1.15;
       // Zoomed in so the UK–EU lanes are readable; the globe bleeds off the frame like a hero banner.
-      const fit = wide ? 2.0 : THREE.MathUtils.clamp(1.7 / camera.aspect, 1.9, 3.8);
-      camera.position.set(0, 0, fit);
+      const fit = tile ? THREE.MathUtils.clamp(2.2 / Math.max(camera.aspect, 0.8), 2.1, 2.7) : wide ? 2.0 : THREE.MathUtils.clamp(1.7 / camera.aspect, 1.9, 3.8);
+      baseCam.set(0, 0, fit);
+      camera.position.copy(baseCam);
       camera.lookAt(0, 0, 0);
-      globe.position.set(wide ? 0.18 : 0, wide ? -0.03 : 0.3, 0);
+      globe.position.set(tile ? 0.34 : wide ? 0.18 : 0, tile ? 0.04 : wide ? -0.03 : 0.3, 0);
       glow.position.copy(globe.position);
       camera.updateProjectionMatrix();
       if (reduced) renderer.render(scene, camera);
@@ -255,11 +333,14 @@ export default function HeroScene({ className = '' }: { className?: string }) {
       raf = requestAnimationFrame(frame);
       if (!visible || document.hidden) { clock.getDelta(); return; }
       const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-      globe.rotation.set(lat0 + sy.update(dt) * 0.6, -lon0 + Math.sin(t * 0.18) * 0.32 + sx.update(dt), 0);
+      globe.rotation.set(lat0 + sy.update(dt) * 0.6, -lon0 + Math.sin(t * 0.18) * (tile ? 0.1 : 0.32) + sx.update(dt), 0);
       glow.rotation.copy(globe.rotation);
+      camera.position.x = smoothDamp(camera.position.x, baseCam.x + sx.target * 0.4, camX, 0.5, dt); // damped camera follow
+      camera.position.y = smoothDamp(camera.position.y, baseCam.y - sy.target * 0.5, camY, 0.5, dt);
+      camera.lookAt(globe.position.x * 0.5, globe.position.y * 0.5, 0);
       dustPts.rotation.y = t * 0.012;
       rings.forEach(({ m, o }) => { const k = ((t * 0.6 + o) % 1); m.scale.setScalar(1 + k * 1.8); (m.material as THREE.MeshBasicMaterial).opacity = (1 - k) * 0.8; });
-      movers.forEach((m) => { m.t = (m.t + m.speed * dt) % 1; place(m.obj, m.curve, m.t); });
+      trucks.forEach((tr) => tr.update(dt));
       packets.forEach((m) => { m.t = (m.t + m.speed * dt) % 1; m.obj.position.copy(m.curve.getPointAt(m.t)); });
       if (plane && planeCurve) {
         planeT = (planeT + 0.035 * dt) % 1;
@@ -271,15 +352,15 @@ export default function HeroScene({ className = '' }: { className?: string }) {
         for (let i = 0; i < trailN; i++) { const p = trailPts[Math.min(i, trailPts.length - 1)] ?? plane.position; arr.setXYZ(i, p.x, p.y, p.z); }
         arr.needsUpdate = true;
       }
-      floaters.forEach((f) => f.mixer.update(dt));
+      floaters.forEach((f) => { f.mixer.update(dt); f.float.update(dt); f.pop.update(dt); f.holder.scale.setScalar(f.base * (1 + f.pop.position * 0.1)); });
       renderer.render(scene, camera);
     };
     if (reduced) {
-      movers.forEach((m) => place(m.obj, m.curve, m.t));
+      trucks.forEach((tr) => { place(tr.g, tr.curve, tr.t); tr.mixer.update(0.01); });
       packets.forEach((m) => m.obj.position.copy(m.curve.getPointAt(m.t)));
       if (plane && planeCurve) place(plane, planeCurve, 0.5);
       globe.rotation.set(lat0, -lon0, 0);
-      floaters.forEach((f) => f.mixer.update(0.01));
+      floaters.forEach((f) => { f.mixer.update(1.8); f.float.update(0.3); });
       renderer.render(scene, camera);
     } else frame();
 
@@ -287,7 +368,8 @@ export default function HeroScene({ className = '' }: { className?: string }) {
       cancelAnimationFrame(raf);
       ro.disconnect(); io.disconnect();
       window.removeEventListener('pointermove', onMove);
-      floaters.forEach((f) => f.mixer.stopAllAction());
+      floaters.forEach((f) => { f.mixer.stopAllAction(); f.float.stopAllAction(); });
+      trucks.forEach((tr) => tr.mixer.stopAllAction());
       disposeScene(scene);
       dotTex.dispose();
       renderer.dispose();
