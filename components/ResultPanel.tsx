@@ -7,7 +7,7 @@ import type { BookingResult } from '@/lib/analyze';
 import type { Issue } from '@/lib/types';
 import { SeverityBadge } from './ui';
 
-function IssueCard({ i }: { i: Issue }) {
+export function IssueCard({ i }: { i: Issue }) {
   const tone = { Red: 'tone-red', Amber: 'tone-amber', Info: 'tone-blue' }[i.severity];
   return (
     <div className="card overflow-hidden">

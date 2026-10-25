@@ -30,6 +30,14 @@ All rule results and carrier maths are deterministic TypeScript (`lib/rules`, `l
 - **Dates** are parsed strictly day-first (`05-11-2026` is 5 November). "Today" is computed at request time in Europe/London.
 - **Chat state lives in the browser**; the server is stateless. Carton total and declared value are computed from items if not stated, flagged "calculated — please confirm".
 
+## Any shipment (live rates) — `/rates`
+A separate mode for parcels between **any** two addresses, using live carrier rates from Shippo (`SHIPPO_API_KEY`). It does not touch the case flow above.
+- **Plain-words input:** describe the shipment and Gemini fills the form (it never invents addresses, values or HS codes; filled fields are outlined so you can check them).
+- **Country of dispatch drives currency and rules** (`lib/countries.ts`, `lib/shippoRules.ts`): declared values are in the dispatch country's currency; every rate is converted into it (ECB reference rates via frankfurter.dev) and the original quote is shown too; the checks and "what usually applies" export notes follow that country (e.g. UK EORI/export declaration, US EEI above US$2,500, EU export declaration outside the EU).
+- **Checks (P-01…P-07):** dangerous goods, customs description/value, HS code, country of origin, export-filing thresholds, export notes, volumetric weight. Customs checks apply only across customs borders (not domestic or intra-EU).
+- **Recommendation:** Cheapest / Fastest / Balanced (50% price, 50% speed; Shippo has no on-time data). Falls back to cheapest when carriers give no transit estimate.
+- Parcels only (≤ 70 kg). Export notes are advisory, not legal advice. Country profiles cover GB, DE, FR, NL, IE, ES, IT, BE, US, CA, AU, IN, CH, JP, SG; other dispatch countries still get rates and the generic checks.
+
 ## Known limitations
 - CSV upload is not supported (a booking needs two sheets); `.xlsx` only.
 - Chat needs `GEMINI_API_KEY`; without it chat cannot read messages (upload is unaffected).
@@ -45,6 +53,6 @@ npm run dev                  # http://localhost:3000
 npm test                     # Vitest: rules, recommender, parser, chat merge
 npm run make-sample          # regenerates public/sample-test-data.xlsx (dates relative to today)
 ```
-Env: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.8-flash`), `GEMINI_FAST_MODEL` (default `gemini-3.5-flash-lite`).
+Env: `SHIPPO_API_KEY` (live rates), `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.8-flash`), `GEMINI_FAST_MODEL` (default `gemini-3.5-flash-lite`).
 
 Reference material is in `docs/` (case brief and template workbook).

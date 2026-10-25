@@ -33,3 +33,48 @@ describe('validateInput', () => {
     expect(validateInput({ from: { ...a, country: 'Germany' }, to: a, parcel: p })).toContain('2-letter');
   });
 });
+
+import { checkShipment, needsCustoms } from '@/lib/shippoRules';
+import { profileFor } from '@/lib/countries';
+
+const addr = (country: string) => ({ street1: '1 Rd', city: 'X', zip: '1', country });
+const parcel = { lengthCm: 30, widthCm: 20, heightCm: 10, weightKg: 2 };
+const ids = (s: Parameters<typeof checkShipment>[0]) => checkShipment(s).issues.filter((i) => i.severity !== 'Info').map((i) => i.ruleId);
+
+describe('country of dispatch', () => {
+  it('currency follows the dispatch country', () => {
+    expect(profileFor('GB')?.currency).toBe('GBP');
+    expect(profileFor('de')?.currency).toBe('EUR');
+    expect(profileFor('US')?.currency).toBe('USD');
+  });
+  it('customs only across customs borders', () => {
+    expect(needsCustoms('GB', 'DE')).toBe(true);
+    expect(needsCustoms('DE', 'FR')).toBe(false);
+    expect(needsCustoms('US', 'US')).toBe(false);
+    expect(needsCustoms('DE', 'US')).toBe(true);
+  });
+});
+describe('checkShipment', () => {
+  const full = { description: 'Ceramic mugs', valueAmount: 60, hsCode: '691200', originCountry: 'GB' };
+  it('clean international shipment', () => expect(ids({ from: addr('GB'), to: addr('DE'), parcel, goods: full })).toEqual([]));
+  it('missing customs data', () => {
+    expect(ids({ from: addr('GB'), to: addr('US'), parcel })).toEqual(['P-02', 'P-03', 'P-04']);
+  });
+  it('domestic and intra-EU need none', () => {
+    expect(ids({ from: addr('DE'), to: addr('FR'), parcel })).toEqual([]);
+    expect(ids({ from: addr('US'), to: addr('US'), parcel })).toEqual([]);
+  });
+  it('flags dangerous goods', () => expect(ids({ from: addr('GB'), to: addr('DE'), parcel, goods: { ...full, description: 'Lithium power bank' } })).toContain('P-01'));
+  it('US export filing threshold', () => expect(ids({ from: addr('US'), to: addr('GB'), parcel, goods: { ...full, valueAmount: 3000 } })).toContain('P-05'));
+  it('volumetric weight note', () => {
+    const r = checkShipment({ from: addr('GB'), to: addr('DE'), parcel: { lengthCm: 60, widthCm: 50, heightCm: 40, weightKg: 2 }, goods: full });
+    expect(r.issues.some((i) => i.ruleId === 'P-07')).toBe(true);
+  });
+});
+describe('currency conversion ranking', () => {
+  it('ranks on prices converted to the dispatch currency', () => {
+    const x = rank([{ ...r('A', 10, 2, 'USD'), amountDispatch: 7.5 }, { ...r('B', 8, 2, 'GBP'), amountDispatch: 8 }], 'Cheapest', 'GBP');
+    expect(x.recommended?.id).toBe('A');
+    expect(x.reason).toContain('GBP');
+  });
+});
