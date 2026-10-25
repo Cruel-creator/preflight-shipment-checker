@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --fg: #14181f;
+  --muted: #5b6573;
+  --border: #dde1e7;
+  --brand: #1d4ed8;
+  --brand-fg: #ffffff;
+  --red-bg: #fde8e8; --red-fg: #9b1c1c; --red-bd: #f5b5b5;
+  --amber-bg: #fff3d6; --amber-fg: #8a5300; --amber-bd: #f2d18a;
+  --green-bg: #e0f5e9; --green-fg: #146c3a; --green-bd: #a9dfc0;
+  --blue-bg: #e3edff; --blue-fg: #1e3a8a; --blue-bd: #b3c9f5;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-2: #1d242d;
+    --fg: #e6e9ee;
+    --muted: #9aa5b4;
+    --border: #2b3440;
+    --brand: #6b9bff;
+    --brand-fg: #0d1117;
+    --red-bg: #3a1618; --red-fg: #ff9b9b; --red-bd: #6b2a2d;
+    --amber-bg: #3a2b10; --amber-fg: #ffcb6b; --amber-bd: #6b5020;
+    --green-bg: #12301f; --green-fg: #7fe0a5; --green-bd: #25563a;
+    --blue-bg: #15264a; --blue-fg: #a9c5ff; --blue-bd: #2c4680;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-brand: var(--brand);
+  --color-brandfg: var(--brand-fg);
+  --font-sans: var(--font-geist-sans);
 }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--font-geist-sans), system-ui, sans-serif; }
+.tone-red { background: var(--red-bg); color: var(--red-fg); border-color: var(--red-bd); }
+.tone-amber { background: var(--amber-bg); color: var(--amber-fg); border-color: var(--amber-bd); }
+.tone-green { background: var(--green-bg); color: var(--green-fg); border-color: var(--green-bd); }
+.tone-blue { background: var(--blue-bg); color: var(--blue-fg); border-color: var(--blue-bd); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: 10px; padding: .6rem 1rem; font-weight: 600; font-size: .9rem; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--fg); }
+.btn:hover { background: var(--surface-2); }
+.btn-primary { background: var(--brand); color: var(--brand-fg); border-color: var(--brand); }
+.btn-primary:hover { background: var(--brand); filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+details > summary { cursor: pointer; }

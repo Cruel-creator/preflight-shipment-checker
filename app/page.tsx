@@ -1,69 +1,32 @@
-import Image from "next/image";
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="mx-auto max-w-3xl space-y-8 py-6">
+      <div className="space-y-3 text-center">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Book cross-border pallets — with a pre-flight checker</h1>
+        <p className="text-muted">
+          UK → Germany, France or the Netherlands. Catch box-count, value, customs-code and weight mistakes <i>before</i> they become customs holds or &quot;missing units&quot;, get a recommended carrier with the reasoning shown, and a draft commercial invoice.
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link href="/chat" className="card block p-6 transition hover:shadow-md">
+          <div className="text-3xl">💬</div>
+          <h2 className="mt-2 text-xl font-semibold">Book by chat</h2>
+          <p className="mt-1 text-sm text-muted">Describe your shipment in plain language. We only ask for what&apos;s missing, and re-check everything when you change a detail.</p>
+        </Link>
+        <Link href="/upload" className="card block p-6 transition hover:shadow-md">
+          <div className="text-3xl">📄</div>
+          <h2 className="mt-2 text-xl font-semibold">Upload a file</h2>
+          <p className="mt-1 text-sm text-muted">Drop in an Excel sheet of many bookings. Every booking gets issues (Red/Amber), fixes, and a carrier recommendation.</p>
+        </Link>
+      </div>
+      <p className="text-center text-sm">
+        <a className="text-brand underline" href="/sample-test-data.xlsx" download>Download a sample file to try</a>
+      </p>
+      <div className="card p-4 text-sm text-muted">
+        <b className="text-fg">How it works:</b> every rule check and price calculation is plain, deterministic code — the AI only helps with language (understanding chat, writing replies, spotting dangerous goods in descriptions, suggesting HS codes). Red = must fix before shipping. Amber = risky, should be fixed or checked.
+      </div>
     </div>
   );
 }
