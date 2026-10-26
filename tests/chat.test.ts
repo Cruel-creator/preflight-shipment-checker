@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyUpdate, diffSnapshots, emptyBooking, missingFields, snapshot } from '@/lib/chat';
+import { applyUpdate, backfillFromMessage, diffSnapshots, emptyBooking, missingFields, snapshot } from '@/lib/chat';
 import { analyseBooking } from '@/lib/analyze';
 import { TODAY } from './fixtures';
 
@@ -98,5 +98,29 @@ describe('mid-conversation change: add a pallet', () => {
     expect(d.weightPerPallet[1]).toBeCloseTo(155, 1);
     expect(d.cost).toEqual([540, 720]);
     expect(d.recommendationNote).toContain('unchanged');
+  });
+});
+
+describe('backfillFromMessage', () => {
+  it('fills priority and gross weight the model left out of a many-detail message', () => {
+    // Live case: the model kept seller, date and appointment but dropped these two.
+    const u = backfillFromMessage('Seller is Pennine Pottery Ltd. Ready 30 October, appointment booked, cheapest please, 1,100 kg gross.', { sellerName: 'Pennine Pottery Ltd' });
+    expect(u).toMatchObject({ sellerName: 'Pennine Pottery Ltd', priority: 'Cheapest', grossWeightKg: 1100 });
+    expect(backfillFromMessage('Priority: fastest. Gross weight 1100 kg. 36 per carton, 0.35 kg each.', {})).toMatchObject({ priority: 'Fastest', grossWeightKg: 1100 });
+    expect(backfillFromMessage('total weight is 820kg, most reliable', {})).toMatchObject({ priority: 'Most reliable', grossWeightKg: 820 });
+  });
+  it('never overrides what the model extracted', () => {
+    expect(backfillFromMessage('cheapest, 900 kg gross', { priority: 'Balanced', grossWeightKg: 950 })).toEqual({ priority: 'Balanced', grossWeightKg: 950 });
+  });
+  it('leaves unit weights, negations and mixed priorities alone', () => {
+    expect(backfillFromMessage('36 per carton, 0.35 kg each', {})).toEqual({});
+    expect(backfillFromMessage("it doesn't need to be the cheapest", {})).toEqual({});
+    expect(backfillFromMessage('cheapest or fastest, which is better?', {})).toEqual({});
+  });
+  it('lets the merged draft complete the booking', () => {
+    const d = applyUpdate(emptyBooking(), backfillFromMessage('Cheapest, and it is 1,100 kg gross.', {})).draft;
+    expect(d.priority).toBe('Cheapest');
+    expect(d.grossWeightKg).toBe(1100);
+    expect(missingFields(d).map((m) => m.field)).not.toContain('priority');
   });
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { analyseBooking } from '@/lib/analyze';
 import {
-  applyUpdate, derivedNotes, diffSnapshots, missingFields, snapshot, templateReply,
+  applyUpdate, backfillFromMessage, derivedNotes, diffSnapshots, missingFields, snapshot, templateReply,
   type BookingUpdate, type Snapshot, type WhatChanged,
 } from '@/lib/chat';
 import { londonToday } from '@/lib/dates';
@@ -59,6 +59,7 @@ function extractionSystem(draft: Booking, today: string) {
   return `You extract shipment booking details from a seller's chat message for a UK→EU pallet freight service.
 Today's date in London is ${today} (${weekday}).
 Return a JSON object with only what the seller stated in their LATEST message; never invent, assume or compute values the seller did not give (except resolving relative dates, and turning relative changes like "add a pallet" into the new absolute number using the current draft).
+A message often answers several of the assistant's questions at once: extract EVERY field it states, e.g. "cheapest, and it's 1,100 kg gross" = priority "Cheapest" and grossWeightKg 1100.
 Map loose language to allowed values. A city implies its country. If the seller names an unsupported city, pass it through unchanged so the app can respond.
 If the seller gives a price per unit for an item, put it in unitPrice. "1,080 mugs at £5 each" = one item: description "mugs", quantity 1080, unitPrice 5. Refer to existing items by their sku. If the message changes the quantity of the only item, use op "update".
 Relative changes are resolved against the current draft: "add a pallet" with ${draft.pallets ?? 'no'} pallets recorded means pallets = ${draft.pallets != null ? draft.pallets + 1 : 'unknown (leave out)'}; "make it 4 pallets" means 4; "remove a pallet" means current − 1. Messages like "yes that's right" confirming calculated totals mean confirmDerived = true.
@@ -140,6 +141,9 @@ export async function POST(req: Request) {
       else if (!ops.length && noHs.length === 1) update = { ...update, itemOps: [{ op: 'update', sku: noHs[0].sku, hsCode: hsCodes[0] }] };
     }
   }
+
+  // Deterministic safety net: priority and gross weight stated in the message but left out by the model.
+  update = backfillFromMessage(last, update);
 
   // 2. Merge in code
   const { draft: next, changes, rejected } = applyUpdate(draft, update);

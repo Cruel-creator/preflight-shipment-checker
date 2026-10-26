@@ -225,6 +225,37 @@ function applyItemFields(item: Item, op: ItemOp, changes: Change[], quiet = fals
   }
 }
 
+/* ---------------------------- extraction backstop ---------------------------- */
+// When one message answers many questions at once, the model reliably extracts some fields and
+// silently leaves out others (seen live: priority and gross weight). These two are stated in
+// unambiguous words, so code picks them up from the message whenever the model left them out.
+const PRIORITY_WORDS: [Priority, RegExp][] = [
+  ['Cheapest', /\b(cheapest|cheaper|cheap|lowest (?:cost|price))\b/],
+  ['Fastest', /\b(fastest|quickest|as (?:fast|quick(?:ly)?) as possible)\b/],
+  ['Most reliable', /\b(most reliable|reliability|reliable)\b/],
+  ['Balanced', /\b(balanced|a balance|no preference)\b/],
+];
+const KG = String.raw`(\d[\d,]*(?:\.\d+)?)\s*(?:kg|kgs|kilos?|kilograms?)\b`;
+const GROSS = new RegExp(String.raw`\bgross(?:\s+weight)?(?:\s+(?:is|of|=|:))?\s*:?\s*${KG}|${KG}\s+(?:gross|total|in total|altogether)\b|\btotal\s+(?:gross\s+)?weight(?:\s+(?:is|of|=|:))?\s*:?\s*${KG}`);
+
+export function backfillFromMessage(text: string, u: BookingUpdate): BookingUpdate {
+  const t = text.toLowerCase();
+  const out = { ...u };
+  if (!out.priority) {
+    const hits = PRIORITY_WORDS.filter(([, re]) => {
+      const m = re.exec(t);
+      return m && !/(?:\bnot\b|n't|\bno\b|\bnever\b)[\w\s']{0,20}$/.test(t.slice(Math.max(0, m.index - 32), m.index));
+    });
+    if (hits.length === 1) out.priority = hits[0][0];
+  }
+  if (out.grossWeightKg == null) {
+    const m = GROSS.exec(t);
+    const n = m && Number((m[1] ?? m[2] ?? m[3]).replace(/,/g, ''));
+    if (n && n > 0) out.grossWeightKg = n;
+  }
+  return out;
+}
+
 /* ------------------------------ missing fields ------------------------------ */
 export interface Missing { field: string; label: string; ask: string; itemSku?: string }
 
