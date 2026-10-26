@@ -46,7 +46,7 @@ export default function UploadPage() {
   const selected = sel != null ? data?.results[sel] : null;
 
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <div>
         <h1 className="font-display text-3xl font-bold tracking-tight">Upload bookings</h1>
         <p className="text-sm text-muted">Excel file with a <b>Bookings</b> and an <b>Items</b> sheet, same layout as the template (max 2 MB, 500 bookings). <a className="text-brand underline" href="/sample-test-data.xlsx" download>Download a sample file to try</a>.</p>

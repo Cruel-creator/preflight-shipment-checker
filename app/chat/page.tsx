@@ -64,8 +64,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <div className="card flex h-[calc(100vh-9rem)] min-h-[480px] flex-col lg:sticky lg:top-4">
+    <div className="page grid gap-5 lg:grid-cols-2">
+      <div className="card flex h-[calc(100vh-11rem)] min-h-[480px] flex-col lg:sticky lg:top-24">
         {llmDown && <div role="status" className="tone-amber border-b px-3 py-2 text-sm">⚠️ The chat assistant is unavailable right now. You can still check bookings with <a className="underline" href="/upload">Upload a file</a>.</div>}
         <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
           {msgs.map((m, i) => (

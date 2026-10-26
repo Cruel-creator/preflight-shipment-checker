@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { Logo } from "@/components/Logo";
-import { Ticker } from "@/components/Ticker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,7 +10,7 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const display = Space_Grotesk({ variable: "--font-display", subsets: ["latin"], weight: ["500", "700"] });
+const display = Archivo({ variable: "--font-display", subsets: ["latin"], weight: ["600", "700", "800"] });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   description: "Book UK-to-EU pallet shipments by chat or spreadsheet, with pre-flight error checks and a carrier recommendation.",
 };
 
+const NAV: [string, string][] = [['/#services', 'Services'], ['/chat', 'Book by chat'], ['/upload', 'Upload bookings'], ['/rates', 'Parcel rates']];
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -29,24 +31,39 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Ticker />
-        <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2.5">
-            <Logo />
-            <nav className="flex w-full justify-between gap-1 text-sm font-medium sm:w-auto sm:justify-end">
-              {[['/chat', 'Book by chat'], ['/upload', 'Upload a file'], ['/rates', 'Live rates']].map(([h, l]) => (
-                <a key={h} href={h} className="rounded-full px-2.5 py-1.5 text-muted sm:px-3 transition hover:bg-surface2 hover:text-fg">{l}</a>
-              ))}
-            </nav>
+        <div className="util-bar">
+          <div className="mx-auto flex max-w-[75rem] justify-between gap-3 px-5 py-1.5">
+            <span>Pallet freight from the UK to Germany, France and the Netherlands</span>
+            <span className="hidden md:inline">Every booking checked before it ships</span>
           </div>
-          <div className="tape" />
+        </div>
+        <header className="site-header">
+          <div className="mx-auto flex max-w-[75rem] items-center justify-between gap-4 px-5 py-3">
+            <Logo />
+            <nav className="site-nav hidden gap-0.5 lg:flex" aria-label="Main">
+              {NAV.map(([h, l]) => <Link key={h} href={h}>{l}</Link>)}
+            </nav>
+            <Link href="/#quote" className="btn btn-primary whitespace-nowrap px-4 py-2.5 text-sm">Get an estimate</Link>
+          </div>
+          <nav className="site-nav flex justify-between gap-1 overflow-x-auto border-t border-line px-3 py-1.5 lg:hidden" aria-label="Main (mobile)">
+            {NAV.slice(1).map(([h, l]) => <Link key={h} href={h}>{l}</Link>)}
+          </nav>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-        <footer className="mt-8 border-t border-line bg-[var(--navy)] text-white/70">
-          <div className="tape" />
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs">
-            <span className="font-display text-sm font-bold text-white">{BRAND.name}</span>
-            <span>{BRAND.tagline}. Prototype with a placeholder brand — advice is guidance, not customs or legal advice.</span>
+        <main className="flex-1">{children}</main>
+        <footer className="bg-[#070f22] text-sm text-white/65">
+          <div className="mx-auto grid max-w-[75rem] gap-8 px-5 py-12 md:grid-cols-[2fr_1fr_1fr]">
+            <div>
+              <Logo dark />
+              <p className="mt-4 max-w-[46ch]">{BRAND.tagline}. Prototype with a placeholder brand: guidance, not customs or legal advice. Photography from Unsplash.</p>
+            </div>
+            <div>
+              <h4 className="label-tag mb-3 text-white">Book</h4>
+              {[['/chat', 'Book by chat'], ['/upload', 'Upload bookings'], ['/rates', 'Parcel rates']].map(([h, l]) => <Link key={h} href={h} className="block py-1 hover:text-white">{l}</Link>)}
+            </div>
+            <div>
+              <h4 className="label-tag mb-3 text-white">Learn</h4>
+              {[['/#checks', 'What we check'], ['/#sea', 'Channel crossing'], ['/#quote', 'Get an estimate']].map(([h, l]) => <Link key={h} href={h} className="block py-1 hover:text-white">{l}</Link>)}
+            </div>
           </div>
         </footer>
       </body>

@@ -1,64 +1,174 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { QuoteBento } from '@/components/home/QuoteBento';
-import { HeroScene } from '@/components/three/Lazy';
-import { InvoicePreview, PreflightPreview } from '@/components/home/PreflightPreview';
-import { CARRIERS } from '@/lib/data/reference';
+import { BookingBar } from '@/components/home/BookingBar';
+import { CtaNet } from '@/components/home/CtaNet';
+import { HomeMotion } from '@/components/home/HomeMotion';
+import { LanesMap } from '@/components/home/LanesMap';
+import { SeaScene } from '@/components/home/SeaScene';
+import { SpotlightCard } from '@/components/ui/SpotlightCard';
+import { PHOTOS } from '@/lib/media';
+import '@/components/home/home.css';
+
+const SERVICES = [
+  { href: '#quote', photo: PHOTOS.road, title: 'Road freight', text: 'Pallets collected in the UK and delivered to the door.' },
+  { href: '#sea', photo: PHOTOS.sea, title: 'Across the Channel', text: 'Trailers cross with their paperwork already right.', pos: '30% 50%' },
+  { href: '#rail', photo: PHOTOS.rail, title: 'Rail links', text: "Freight on Europe's rail network for the long legs.", pos: '25% 50%' },
+  { href: '#air', photo: PHOTOS.air, title: 'Parcels by air', text: 'Live rates for parcels to any address.' },
+];
+
+const STEPS = [
+  ['Describe it', 'Tell us in plain words, or upload the Bookings and Items sheets. We only ask for what is missing.'],
+  ['We check it', 'Customs codes, values, carton counts, pallet weights and dangerous goods, each with the exact fix.'],
+  ['It ships', 'The right carrier for your priority, a draft commercial invoice and a clear list of what happens next.'],
+];
+
+const CHECKS = [
+  ['Customs paperwork', 'Commodity codes, values and origins that match your invoice, so nothing is held at the border.'],
+  ['Counts and weights', 'Cartons, units and weights that add up, so the warehouse receives exactly what you sent.'],
+  ['Safe to carry', 'Goods that can travel on a standard pallet service, on pallets the carrier will accept.'],
+  ['Ready to deliver', 'A realistic collection date and a delivery slot, so the truck is not turned away.'],
+];
+
+const icon = (d: string, accent: string) => (
+  <svg viewBox="0 0 40 40" fill="none" stroke="#0a1024" strokeWidth="2.2" aria-hidden="true"><path d={d} /><path d={accent} stroke="#c41f2e" /></svg>
+);
 
 export default function Home() {
-  const from = Math.min(...CARRIERS.map((c) => c.pricePerPallet));
-
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-      {/* hero tile */}
-      <section className="card relative isolate order-1 min-h-[520px] overflow-hidden bg-[var(--navy)] text-white md:col-span-7">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_100%_0%,rgba(255,106,26,0.32),transparent_60%),radial-gradient(50%_60%_at_0%_100%,rgba(70,120,220,0.25),transparent_70%)]" />
-        <HeroScene framing="tile" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--navy)] via-[var(--navy)]/70 via-45% to-transparent md:bg-gradient-to-r md:via-[var(--navy)]/40 md:via-40%" />
-        <div className="relative z-10 flex h-full min-h-[520px] max-w-md flex-col md:max-w-[64%] justify-end gap-4 p-6 pt-64 sm:p-8 md:justify-center md:pt-8">
-          <span className="label-tag inline-flex w-fit items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1"><span className="truckbob">🚚</span> UK → Germany · France · Netherlands</span>
-          <h1 className="font-display text-4xl font-bold leading-[1.04] tracking-tight sm:text-5xl">Ship it right <span className="text-[var(--orange)]">the first time.</span></h1>
-          <p className="text-white/75">Book pallets across the Channel and see every mistake — box counts, values, customs codes, weights — before it becomes a customs hold.</p>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/chat" className="btn btn-primary">💬 Book by chat</Link>
-            <Link href="/upload" className="btn border-white/30 bg-white/10 text-white hover:bg-white/20">📄 Upload a file</Link>
+    <div className="home">
+      <HomeMotion />
+
+      <section className="hero" id="quote">
+        <div className="wrap hero-grid">
+          <div>
+            <span className="tag eyebrow hero-in">Road freight to Europe</span>
+            <h1 className="hero-in">Reliable <em>pallet freight</em> from the UK to Europe.</h1>
+            <p className="lede hero-in">Describe your shipment or drop in your bookings file. We check every customs code, count and weight, then put it on the right truck.</p>
+            <div className="ctas hero-in">
+              <Link className="btn btn-primary" href="/chat">Book by chat</Link>
+              <Link className="btn" href="/upload">Upload a bookings file</Link>
+            </div>
+            <div className="points hero-in"><span>Customs checks</span><span>Carrier matched to your priority</span><span>Draft invoice</span></div>
           </div>
-          <dl className="mt-2 grid grid-cols-3 gap-3 border-t border-white/15 pt-4">
-            <div><dt className="label-tag text-white/60">Lanes from</dt><dd className="font-display text-2xl font-bold">£{from}</dd></div>
-            <div><dt className="label-tag text-white/60">Transit</dt><dd className="font-display text-2xl font-bold">2–5d</dd></div>
-            <div><dt className="label-tag text-white/60">On time up to</dt><dd className="font-display text-2xl font-bold">98%</dd></div>
-          </dl>
+          <div className="frame hero-in">
+            <Image id="heroImg" src={PHOTOS.road.src} alt={PHOTOS.road.alt} fill priority sizes="(max-width: 900px) 100vw, 55vw" />
+            <span className="badge"><i />Checked and ready to ship</span>
+          </div>
+        </div>
+        <div className="wrap bookwrap hero-in"><BookingBar /></div>
+      </section>
+
+      <section className="band" id="services">
+        <div className="wrap">
+          <span className="tag eyebrow rv">Services</span>
+          <h2 className="rv">Every leg of the trip, <em>checked once</em>.</h2>
+          <div className="modes">
+            {SERVICES.map((s) => (
+              <a key={s.title} className="mode rv" href={s.href}>
+                <Image src={s.photo.src} alt="" fill sizes="(max-width: 900px) 50vw, 25vw" style={s.pos ? { objectPosition: s.pos } : undefined} />
+                <span className="txt"><h3>{s.title}</h3><p>{s.text}</p></span>
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 
-      <QuoteBento />
-
-      <PreflightPreview />
-      <InvoicePreview />
-
-      <Link href="/chat" className="card lift order-6 p-5 md:col-span-4">
-        <div className="text-3xl">💬</div>
-        <h3 className="font-display mt-2 text-lg font-bold">Book by chat</h3>
-        <div className="mt-3 space-y-2 text-sm">
-          <div className="w-fit max-w-[92%] rounded-2xl bg-[var(--navy)] px-3 py-2 text-white">1,080 mugs to Frankfurt, 3 pallets</div>
-          <div className="w-fit max-w-[92%] rounded-2xl bg-surface2 px-3 py-2">Got it. When will they be ready?</div>
+      <section className="sea" id="sea">
+        <SeaScene />
+        <div className="wrap copy">
+          <span className="tag eyebrow on-dark rv">Across the Channel</span>
+          <h2 className="rv">Your goods cross <em>with the paperwork</em> already right.</h2>
+          <p className="sub rv">Customs codes, values and origins are checked before anything reaches the port, so nothing waits at the border for a correction.</p>
         </div>
-      </Link>
-      <Link href="/upload" className="card lift order-7 p-5 md:col-span-4">
-        <div className="text-3xl">📄</div>
-        <h3 className="font-display mt-2 text-lg font-bold">Upload a file</h3>
-        <p className="mt-1 text-sm text-muted">Every booking in a spreadsheet gets issues, fixes and a carrier.</p>
-        <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-semibold"><span className="tone-green rounded-full border px-2 py-1">✅ Ready</span><span className="tone-amber rounded-full border px-2 py-1">⚠️ Warnings</span><span className="tone-red rounded-full border px-2 py-1">⛔ Blocked</span></div>
-      </Link>
-      <Link href="/rates" className="card lift relative order-8 overflow-hidden bg-[var(--navy)] p-5 text-white md:col-span-4">
-        <div className="text-3xl">🌍</div>
-        <h3 className="font-display mt-2 text-lg font-bold">Shipping elsewhere?</h3>
-        <p className="mt-1 text-sm text-white/70">Live rates for any parcel, any address — in the currency and under the rules of the country you ship from.</p>
-        <svg className="absolute -bottom-8 -right-8 h-36 w-36 opacity-30" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#fff" /><ellipse cx="50" cy="50" rx="20" ry="44" fill="none" stroke="#fff" /><path d="M6 50h88M14 28h72M14 72h72" stroke="#fff" fill="none" /></svg>
-      </Link>
+      </section>
 
-      <p className="card order-9 p-4 text-sm text-muted md:col-span-12">
-        <b className="text-fg">How it works:</b> every rule check and price calculation is plain, deterministic code — the AI only helps with language. <b className="text-fg">Red</b> = must fix before shipping. <b className="text-fg">Amber</b> = risky, should be fixed or checked. The quote above uses the same recommender as the booking flows.
-      </p>
+      <section className="band">
+        <div className="wrap">
+          <span className="tag eyebrow rv">How a booking moves</span>
+          <h2 className="rv">From your description to a truck, <em>checked on the way</em>.</h2>
+          <div className="journey">
+            <svg className="route" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true">
+              <path id="routeLine" d="M10 20 C 250 20, 300 4, 500 20 S 760 36, 990 20" fill="none" stroke="#0a1024" strokeWidth="2.5" strokeDasharray="7 7" />
+              <g id="rider"><rect x="-14" y="-8" width="20" height="12" rx="1.5" fill="#c41f2e" /><rect x="6" y="-5" width="8" height="9" rx="1.5" fill="#0a1024" /></g>
+            </svg>
+            <div className="steps">
+              {STEPS.map(([h, p]) => <div key={h} className="step rv"><div className="dot" /><h3>{h}</h3><p>{p}</p></div>)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rail" id="rail">
+        <div className="wrap rail-grid">
+          <div>
+            <span className="tag eyebrow on-dark rv">Rail links</span>
+            <h2 className="rv">Long legs across Europe, <em>on the rails</em>.</h2>
+            <p className="sub rv">Once your goods are across the Channel, the longer runs into Germany can go by rail freight, with the same paperwork travelling with them.</p>
+          </div>
+          <div className="shot rv"><Image id="trainImg" src={PHOTOS.rail.src} alt={PHOTOS.rail.alt} fill sizes="(max-width: 900px) 100vw, 55vw" /></div>
+        </div>
+      </section>
+
+      <section className="band mapband">
+        <div className="wrap mapgrid">
+          <div>
+            <span className="tag eyebrow rv">Where we go</span>
+            <h2 className="rv">From the UK to the <em>heart of Europe</em>.</h2>
+            <ul className="rv">{['Berlin', 'Frankfurt', 'Hamburg', 'Paris', 'Lyon', 'Amsterdam', 'Rotterdam'].map((c) => <li key={c}>{c}</li>)}</ul>
+          </div>
+          <LanesMap />
+        </div>
+      </section>
+
+      <section className="air" id="air">
+        <div className="photo"><Image id="planeImg" src={PHOTOS.air.src} alt={PHOTOS.air.alt} fill sizes="100vw" /></div>
+        <div className="wrap">
+          <span className="tag eyebrow rv" style={{ color: '#ffd0d4' }}>Parcels further afield</span>
+          <h2 className="rv" style={{ maxWidth: '14ch' }}>Sending a parcel <em>beyond Europe</em>?</h2>
+          <p className="sub rv">Live carrier rates for any address, priced in the currency of the country you ship from and checked against its export rules.</p>
+          <Link className="btn btn-white rv mt-6" href="/rates">Price a parcel</Link>
+        </div>
+      </section>
+
+      <section className="band" id="checks">
+        <div className="wrap">
+          <span className="tag eyebrow rv">Pre-flight checks</span>
+          <h2 className="rv">Problems found <em>before your pallet leaves</em> the dock.</h2>
+          <p className="sub rv">Every booking is looked over before it is handed to a carrier, and anything that needs changing comes back with a plain-English fix.</p>
+          <div className="checks">
+            {CHECKS.map(([h, p]) => <div key={h} className="col rv"><h3>{h}</h3><p>{p}</p></div>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="band" id="ways" style={{ paddingTop: 0 }}>
+        <div className="wrap">
+          <span className="tag eyebrow rv">Ways to book</span>
+          <h2 className="rv">Book the way your shipment <em>already lives</em>.</h2>
+          <div className="ways">
+            <SpotlightCard href="/chat" className="rv">
+              <span className="ico">{icon('M6 9h28v17H17l-7 6v-6H6z', 'M12 16h16M12 21h10')}</span>
+              <h3>Book by chat</h3><p>Describe the shipment like you would to a forwarder. Change a detail mid-way and the checks update.</p><span className="more">Start a booking →</span>
+            </SpotlightCard>
+            <SpotlightCard href="/upload" className="rv">
+              <span className="ico">{icon('M10 5h14l7 7v23H10zM24 5v7h7', 'M15 20h11M15 25h11M15 30h7')}</span>
+              <h3>Upload bookings</h3><p>Drop in the Bookings and Items sheets. Every booking comes back with its issues, fixes and a carrier.</p><span className="more">Check a file →</span>
+            </SpotlightCard>
+            <SpotlightCard href="/rates" className="rv">
+              <span className="ico">{icon('M8 14l12-7 12 7v13l-12 7-12-7z', 'M8 14l12 7 12-7M20 21v13')}</span>
+              <h3>Parcel rates</h3><p>Live carrier rates for any address, checked against the export rules of the country you ship from.</p><span className="more">Price a parcel →</span>
+            </SpotlightCard>
+          </div>
+        </div>
+      </section>
+
+      <section className="cta">
+        <CtaNet />
+        <div className="wrap">
+          <h2>Ready to book? <em>Start with an estimate.</em></h2>
+          <a className="btn btn-primary" href="#quote">Get an estimate</a>
+        </div>
+      </section>
     </div>
   );
 }
