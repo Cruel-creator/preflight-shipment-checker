@@ -336,6 +336,9 @@ export function dataChecks(b: Booking): Issue[] {
   const dest = b.destinationCountry;
   if (dest && !(dest in DESTINATIONS)) {
     issues.push(dataIssue('DATA-02', 'Red', 'Unsupported destination country', `"${dest}" is not supported. Supported: ${Object.keys(DESTINATIONS).join(', ')}.`, [`Choose one of: ${Object.keys(DESTINATIONS).join(', ')}.`]));
+  } else if (dest && b.destinationCity && !Object.values(DESTINATIONS).flat().includes(b.destinationCity)) {
+    // A city we don't serve at all (e.g. Munich): unsupported, not a city/country mismatch.
+    issues.push(dataIssue('DATA-02', 'Red', 'Unsupported destination city', `"${b.destinationCity}" is not a supported city in ${dest}. Supported in ${dest}: ${DESTINATIONS[dest].join(', ')}.`, [`Choose one of: ${DESTINATIONS[dest].join(', ')}.`]));
   } else if (dest && b.destinationCity && !DESTINATIONS[dest].includes(b.destinationCity)) {
     const inOther = Object.entries(DESTINATIONS).find(([, cs]) => cs.includes(b.destinationCity!))?.[0];
     issues.push(dataIssue('DATA-01', 'Red', 'Destination city is not in the destination country',

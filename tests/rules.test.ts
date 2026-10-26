@@ -184,7 +184,19 @@ describe('DATA checks', () => {
     expect(i.whatsWrong).toContain('France');
   });
   it('no items', () => expect(ids(bk001({ items: [] }))).toContain('DATA-03'));
-  it('unsupported city', () => expect(ids(bk001({ destinationCity: 'Munich' }))).toContain('DATA-01'));
+  it('unsupported city is not called a country mismatch', () => {
+    const i = run(bk001({ destinationCity: 'Munich' })).issues.find((x) => x.ruleId === 'DATA-02')!;
+    expect(i.title).toBe('Unsupported destination city');
+    expect(i.howToFix[0]).toContain('Frankfurt');
+    expect(ids(bk001({ destinationCity: 'Munich' }))).not.toContain('DATA-01');
+  });
+  it('a typed priority outside the four is flagged, not a crash', () => {
+    const c = run(bk001({ priority: 'ASAP' as never }));
+    expect(c.issues.map((x) => x.ruleId)).toContain('DATA-02');
+    expect(c.status).toBe('Blocked');
+    expect(c.recommendation.recommended).toBeNull();
+    expect(c.recommendation.reason).toContain('ASAP');
+  });
 });
 
 describe('overall status', () => {
