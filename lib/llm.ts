@@ -44,6 +44,7 @@ export async function genText(model: string, system: string, turns: ChatTurn[], 
   const res = await c.models.generateContent({
     model,
     contents: toContents(turns),
+    config: { systemInstruction: system, maxOutputTokens, temperature: 0.2, thinkingConfig: thinking(model) },
   });
   return (res.text ?? '').trim();
 }

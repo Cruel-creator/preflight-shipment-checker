@@ -48,8 +48,11 @@ export const RULEBOOK: { id: string; rule: string; severity: 'Red' | 'Amber' }[]
 ];
 
 export const DG_KEYWORDS = [
-  'lithium', 'li-ion', 'li ion', 'lipo', 'battery', 'batteries', 'power bank',
-  'aerosol', 'spray can', 'spray', 'propellant', 'flammable', 'lighter fluid', 'butane',
-  'petrol', 'gasoline', 'kerosene', 'paraffin', 'solvent', 'thinner', 'acetone',
-  'nail polish', 'perfume', 'alcohol-based', 'ethanol', 'spirit',
+  'lithium', 'li-ion', 'li ion', 'lipo', 'battery', 'batteries', 'power bank', 'portable charger', 'mah',
+  'rechargeable', 'cordless', 'bluetooth speaker', 'bluetooth headphones', 'bluetooth earbuds', 'wireless earbuds',
+  'wireless headphones', 'e-cigarette', 'vape', 'drone', 'hoverboard', 'electric toothbrush',
+  'aerosol', 'spray can', 'spray', 'hairspray', 'dry shampoo', 'shaving foam', 'propellant',
+  'flammable', 'lighter fluid', 'butane',
+  'petrol', 'gasoline', 'kerosene', 'paraffin', 'solvent', 'thinner', 'acetone', 'turpentine', 'methylated', 'isopropyl',
+  'hand sanitiser', 'hand sanitizer', 'nail polish', 'nail varnish', 'varnish', 'lacquer', 'perfume', 'alcohol-based', 'ethanol', 'spirit',
 ];

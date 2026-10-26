@@ -12,6 +12,12 @@ const NEGATIONS: RegExp[] = [
   /\bspray\s+(bottle\s+)?(cap|nozzle)\b/gi,
 ];
 
+const BATTERY_WORDS = [
+  'battery', 'batteries', 'lithium', 'li-ion', 'li ion', 'lipo', 'power bank', 'portable charger', 'mah', 'rechargeable',
+  'cordless', 'bluetooth speaker', 'bluetooth headphones', 'bluetooth earbuds', 'wireless earbuds', 'wireless headphones',
+  'e-cigarette', 'vape', 'drone', 'hoverboard', 'electric toothbrush',
+];
+
 export interface DgHit {
   keyword: string;
   reason: string;
@@ -26,14 +32,19 @@ export function scanDescription(description: string): DgHit | null {
       if (kw === 'perfume') {
         return { keyword: kw, reason: 'Check — perfumes are often flammable liquids (alcohol-based).' };
       }
-      if (['battery', 'batteries', 'lithium', 'li-ion', 'li ion', 'lipo', 'power bank'].includes(kw)) {
+      if (BATTERY_WORDS.includes(kw)) {
         return { keyword: kw, reason: `"${kw}" suggests a lithium/other battery, which is dangerous goods.` };
       }
-      if (['aerosol', 'spray can', 'spray', 'propellant'].includes(kw)) {
+      if (['aerosol', 'spray can', 'spray', 'hairspray', 'dry shampoo', 'shaving foam', 'propellant'].includes(kw)) {
         return { keyword: kw, reason: `"${kw}" suggests an aerosol (pressurised container), which is dangerous goods.` };
       }
       return { keyword: kw, reason: `"${kw}" suggests a flammable liquid, which is dangerous goods.` };
     }
+  }
+  // Drinks over 24% alcohol by volume (most spirits) are flammable liquids.
+  const abv = text.match(/(\d+(?:\.\d+)?)\s*%\s*(abv|vol|alc)/);
+  if (abv && Number(abv[1]) > 24) {
+    return { keyword: abv[0].trim(), reason: `"${abv[0].trim()}" means over 24% alcohol, which is a flammable liquid (dangerous goods).` };
   }
   return null;
 }

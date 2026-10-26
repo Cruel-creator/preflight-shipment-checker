@@ -132,11 +132,17 @@ describe('R-06 dangerous goods', () => {
   });
   it('flags HS 8507', () => expect(ids(bk001({ items: [mug({ hsCode: '850760' })] }))).toContain('R-06'));
   it('uses LLM backstop', () => {
-    const b = bk001({ items: [mug({ description: 'Rechargeable desk fan' })] });
+    const b = bk001({ items: [mug({ description: 'USB desk fan' })] });
     expect(ids(b)).not.toContain('R-06');
-    expect(ids(b, { llmDangerous: { 'MUG-01': { isDangerous: true, category: 'Lithium battery', reason: 'rechargeable fans contain Li-ion cells' } } })).toContain('R-06');
+    expect(ids(b, { llmDangerous: { 'MUG-01': { isDangerous: true, category: 'Lithium battery', reason: 'portable desk fans often contain Li-ion cells' } } })).toContain('R-06');
   });
   it('perfume reads as a "check"', () => expect(scanDescription('Eau de perfume')?.reason).toContain('Check'));
+  it('catches by keyword what used to need the AI', () => {
+    for (const d of ['Nail varnish 10 ml, red', 'Bluetooth speaker, portable', 'Portable charger 20000mAh', 'Deodorant spray 150 ml', 'London dry gin 70cl, 40% ABV', 'Drone with camera', 'Rechargeable desk fan']) expect(scanDescription(d), d).not.toBeNull();
+  });
+  it('does not flag accessories, negations or weak drinks', () => {
+    for (const d of ['Mobile phone case, silicone', 'Laptop sleeve, neoprene', 'Battery-free wall clock', 'Lager 4.5% ABV', 'Wooden balance bike', 'Ginger biscuits']) expect(scanDescription(d), d).toBeNull();
+  });
 });
 
 describe('R-07 gross weight', () => {
