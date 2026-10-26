@@ -77,6 +77,8 @@ Rules:
 - If a Red or Amber issue is new or relevant, explain it in one plain sentence (stated vs calculated) and the simplest fix. Red = must be fixed before shipping; Amber = risky.
 - When complete (missing is empty): give a 2-3 sentence summary: status, recommended carrier, why (use the supplied reason), and total cost. Tell them they can press "Confirm booking" (if status is not Blocked).
 - Do NOT ask clarifying questions beyond the missing list, and do not comment on country-of-origin wording or other details not in FACTS.
+- The app only checks the booking and recommends a carrier. Never offer or promise anything else: do not book delivery appointments, contact Amazon or any warehouse, arrange customs, or mention CARP, FBA IDs or DG paperwork. For R-08, tell the seller to book the slot themselves.
+- Transit times and delivery dates are calendar days. Say "days", never "business days" or "working days".
 - Warm, concise, plain English, under 120 words. Plain text only: no headings, no bold, no tables, no bullet lists (a numbered list is fine for questions).`;
 
 export async function POST(req: Request) {
@@ -124,6 +126,18 @@ export async function POST(req: Request) {
     } else if (r) {
       const n = r[2] ? (Number(r[2]) || words[r[2]] || 1) : 1;
       update = { ...update, pallets: Math.max(1, draft.pallets - n) };
+    }
+  }
+
+  // Deterministic safety net: an HS code typed in the message ("HS 850760") must land on an item.
+  const hsCodes = [...last.matchAll(/\bhs(?:\s*code)?\s*(?:is|:|=|-)?\s*(\d[\d.\s]{3,}\d)/g)].map((x) => x[1].replace(/[\s.]/g, ''));
+  if (hsCodes.length === 1) {
+    const ops = update.itemOps ?? [];
+    if (!ops.some((o) => o.hsCode)) {
+      const live = ops.filter((o) => o.op !== 'remove');
+      const noHs = draft.items.filter((i) => !i.hsCode?.trim());
+      if (live.length === 1) live[0].hsCode = hsCodes[0];
+      else if (!ops.length && noHs.length === 1) update = { ...update, itemOps: [{ op: 'update', sku: noHs[0].sku, hsCode: hsCodes[0] }] };
     }
   }
 

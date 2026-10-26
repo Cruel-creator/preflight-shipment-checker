@@ -142,6 +142,24 @@ export function parseWorkbook(data: ArrayBuffer | Uint8Array | Buffer): ParseRes
     cartons: col(it, 'Cartons'), weight: col(it, 'Unit weight (kg)', 'Unit weight'), origin: col(it, 'Country of origin'),
   };
   const get = (r: Cell[], i: number): Cell => (i >= 0 ? r[i] : null);
+  const warnings: Issue[] = [];
+
+  // The template ships with a grey example row (BK-001, Northfield Goods). If the uploaded data also
+  // uses BK-001, keeping the example would merge two bookings under one ID, so leave the example out.
+  const sig = (r: Cell[], text: number[], nums: number[]) =>
+    [...text.map((i) => norm(get(r, i))), ...nums.map((i) => String(Number(get(r, i))))].join('|');
+  const exampleBooking = (r: Cell[]) =>
+    sig(r, [C.id, C.seller, C.oCity, C.dCity], [C.pallets, C.cartons, C.value, C.weight]) === 'bk-001|northfield goods|manchester|frankfurt|3|90|5400|620';
+  const exampleItem = (r: Cell[]) =>
+    sig(r, [I.id, I.sku], [I.qty, I.price, I.upc, I.cartons]) === 'bk-001|mug-01|1080|5|12|90';
+  if (bt.rows.length > 1 && exampleBooking(bt.rows[0]) && bt.rows.slice(1).some((r) => norm(get(r, C.id)) === 'bk-001')) {
+    bt.rows.shift();
+    const ei = it.rows.findIndex(exampleItem);
+    if (ei >= 0) it.rows.splice(ei, 1);
+    warnings.push(dataIssue('DATA-10', 'Info', 'Template example row skipped',
+      'The first row is the template\'s grey example (BK-001, Northfield Goods) and another booking also uses BK-001, so the example row and its MUG-01 item were left out to keep the two bookings apart.',
+      ['Delete the grey example row before uploading.']));
+  }
 
   const bookings: Booking[] = [];
   const byId = new Map<string, Booking>();
@@ -208,7 +226,6 @@ export function parseWorkbook(data: ArrayBuffer | Uint8Array | Buffer): ParseRes
     bookings.push(b);
   }
 
-  const warnings: Issue[] = [];
   for (const r of it.rows) {
     const id = str(get(r, I.id));
     const sku = str(get(r, I.sku)) ?? '(no SKU)';

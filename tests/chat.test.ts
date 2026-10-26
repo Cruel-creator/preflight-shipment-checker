@@ -44,6 +44,32 @@ describe('applyUpdate', () => {
   });
 });
 
+describe('extraction clean-up', () => {
+  it('strips model junk and maps loose country names', () => {
+    const r = applyUpdate(first.draft, { itemOps: [{ op: 'add', description: 'power banks', countryOfOrigin: 'ChinaControl Token Removed', hsCode: ' 850760 ' }] });
+    expect(r.draft.items[1]).toMatchObject({ countryOfOrigin: 'China', hsCode: '850760' });
+    const uk = applyUpdate(first.draft, { itemOps: [{ op: 'update', countryOfOrigin: 'UK' }] });
+    expect(uk.draft.items[0].countryOfOrigin).toBe('United Kingdom');
+  });
+  it('works out item cartons from quantity ÷ units per carton, and keeps them in step', () => {
+    const r = applyUpdate(first.draft, { itemOps: [{ op: 'update', unitsPerCarton: 12 }] });
+    expect(r.draft.items[0]).toMatchObject({ cartons: 90, cartonsDerived: true });
+    expect(r.draft.cartons).toBe(90);
+    const more = applyUpdate(r.draft, { itemOps: [{ op: 'update', quantity: 1200 }] });
+    expect(more.draft.items[0].cartons).toBe(100);
+    const stated = applyUpdate(r.draft, { itemOps: [{ op: 'update', cartons: 80 }] });
+    expect(stated.draft.items[0]).toMatchObject({ cartons: 80, cartonsDerived: false });
+  });
+  it('a confirmed total that matched the items follows them when a line is added', () => {
+    const confirmed = applyUpdate(first.draft, { confirmDerived: true }).draft;
+    const r = applyUpdate(confirmed, { itemOps: [{ op: 'add', description: 'bowls', quantity: 100, unitPrice: 3 }] });
+    expect(r.draft.declaredValue).toBe(5700);
+    expect(r.draft.derived?.declaredValue).toBe(true);
+    const stated = applyUpdate({ ...confirmed, declaredValue: 3000 }, { itemOps: [{ op: 'add', description: 'bowls', quantity: 100, unitPrice: 3 }] });
+    expect(stated.draft.declaredValue).toBe(3000);
+  });
+});
+
 describe('missingFields', () => {
   it('asks for everything not yet given, appointment only for warehouses', () => {
     const m = missingFields(first.draft).map((x) => x.field);

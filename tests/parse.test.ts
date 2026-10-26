@@ -90,6 +90,26 @@ describe('robustness', () => {
     expect(ids).toContain('DATA-06');
     expect(ids).toContain('DATA-05');
   });
+  it('drops the grey template example when the data also uses BK-001', () => {
+    const ex = ['BK-001', 'Northfield Goods', 'Manchester', 'United Kingdom', 'Frankfurt', 'Germany', 'Warehouse', '05-11-2026', 'Cheapest', 3, 90, 5400, 'GBP', 620, 'Yes'];
+    const exItem = ['BK-001', 'MUG-01', 'Ceramic coffee mug, 350 ml', 691200, 1080, 5, 12, 90, 0.5, 'United Kingdom'];
+    const mine = ['BK-001', 'Pennine Crafts', 'Leeds', 'United Kingdom', 'Paris', 'France', 'Business address', '12-11-2026', 'Fastest', 1, 20, 900, 'GBP', 180, 'No'];
+    const mineItem = ['BK-001', 'QLT-01', 'Handmade cotton quilt', 940490, 20, 45, 1, 20, 6, 'United Kingdom'];
+    const r = parseWorkbook(build([['title'], bh, ex, mine], [['title'], ih, exItem, mineItem]));
+    expect(r.bookings).toHaveLength(1);
+    expect(r.bookings[0]).toMatchObject({ sellerName: 'Pennine Crafts', pallets: 1 });
+    expect(r.bookings[0].items.map((i) => i.sku)).toEqual(['QLT-01']);
+    expect(r.bookings[0].parseIssues).toEqual([]);
+    expect(r.warnings.map((w) => [w.ruleId, w.severity])).toEqual([['DATA-10', 'Info']]);
+    expect(real(runChecks(r.bookings[0], { today: '2026-10-25' }))).toEqual([]);
+  });
+  it('keeps the example row when no other booking uses BK-001', () => {
+    const ex = ['BK-001', 'Northfield Goods', 'Manchester', 'United Kingdom', 'Frankfurt', 'Germany', 'Warehouse', '05-11-2026', 'Cheapest', 3, 90, 5400, 'GBP', 620, 'Yes'];
+    const other = ['BK-002', 'Pennine Crafts', 'Leeds', 'United Kingdom', 'Paris', 'France', 'Business address', '12-11-2026', 'Fastest', 1, 20, 900, 'GBP', 180, 'No'];
+    const r = parseWorkbook(build([bh, ex, other], [ih]));
+    expect(r.bookings.map((b) => b.bookingId)).toEqual(['BK-001', 'BK-002']);
+    expect(r.warnings).toEqual([]);
+  });
   it('throws a clear error without a Booking ID header', () => {
     expect(() => parseWorkbook(build([['a', 'b']], [['c']]))).toThrow(/Booking ID/);
   });

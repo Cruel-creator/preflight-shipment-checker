@@ -11,6 +11,8 @@ export interface Item {
   cartons: number | null;
   unitWeightKg: number | null;
   countryOfOrigin: string | null;
+  /** true = cartons computed in chat from quantity ÷ units per carton, not stated by the seller */
+  cartonsDerived?: boolean;
 }
 
 export interface Booking {

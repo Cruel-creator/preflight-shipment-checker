@@ -48,6 +48,21 @@ export interface Rejected { field: string; value: string; options: string[] }
 
 const canon = (v: string, list: readonly string[]) => list.find((x) => x.toLowerCase() === v.trim().toLowerCase()) ?? null;
 const isPos = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+/** Model output can carry junk such as "Control Token Removed" or stray control characters. */
+const clean = (s: string) => s.replace(/control token removed/gi, ' ').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+
+const ORIGIN_ALIASES: Record<string, string> = {
+  uk: 'United Kingdom', 'u.k.': 'United Kingdom', gb: 'United Kingdom', britain: 'United Kingdom', 'great britain': 'United Kingdom',
+  england: 'United Kingdom', prc: 'China', 'viet nam': 'Vietnam', turkiye: 'Turkey', 'türkiye': 'Turkey',
+};
+/** Map loose country wording to the allowed list; keep the cleaned original if nothing matches. */
+function originCountry(v: string): string {
+  const s = clean(v);
+  const low = s.toLowerCase();
+  return canon(s, ITEM_ORIGIN_COUNTRIES) ?? ORIGIN_ALIASES[low] ?? ITEM_ORIGIN_COUNTRIES.find((c) => low.startsWith(c.toLowerCase())) ?? s;
+}
+const valueOf = (items: Item[]) => (items.length && items.every((i) => isPos(i.quantity) && isPos(i.unitPrice)) ? items.reduce((s, i) => s + i.quantity! * i.unitPrice!, 0) : null);
+const cartonsOf = (items: Item[]) => (items.length && items.every((i) => isPos(i.cartons)) ? items.reduce((s, i) => s + i.cartons!, 0) : null);
 const fmt = (v: unknown): string | null => (v == null ? null : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v));
 
 const LABELS: Record<string, string> = {
@@ -82,6 +97,13 @@ function findItem(items: Item[], op: ItemOp): Item | undefined {
 export function recomputeDerived(b: Booking): void {
   b.derived ??= {};
   const its = b.items;
+  // Item cartons follow from quantity ÷ units per carton when the seller hasn't stated them.
+  for (const i of its) {
+    if ((i.cartons == null || i.cartonsDerived) && isPos(i.quantity) && isPos(i.unitsPerCarton) && i.unitsPerCarton > 0) {
+      const c = i.quantity / i.unitsPerCarton;
+      if (Number.isInteger(c)) { i.cartons = c; i.cartonsDerived = true; } else if (i.cartonsDerived) { i.cartons = null; i.cartonsDerived = false; }
+    }
+  }
   if ((b.declaredValue == null || b.derived.declaredValue) && its.length && its.every((i) => isPos(i.quantity) && isPos(i.unitPrice))) {
     b.declaredValue = its.reduce((s, i) => s + i.quantity! * i.unitPrice!, 0);
     b.derived.declaredValue = true;
@@ -104,7 +126,7 @@ export function applyUpdate(prev: Booking, u: BookingUpdate): { draft: Booking; 
       draft[k] = v;
     }
   };
-  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const str = (v: unknown) => (typeof v === 'string' && clean(v) ? clean(v) : null);
 
   if (str(u.sellerName)) set('sellerName', str(u.sellerName)!);
   if (str(u.originCity)) {
@@ -148,12 +170,20 @@ export function applyUpdate(prev: Booking, u: BookingUpdate): { draft: Booking; 
   if (typeof u.appointmentBooked === 'boolean') set('appointmentBooked', u.appointmentBooked);
   if (u.confirmDerived) draft.derived = { cartons: false, declaredValue: false };
 
+  // A total that matched the old items keeps following the items when lines change,
+  // unless the seller states a new total in this message.
+  if (u.itemOps?.length) {
+    const pv = valueOf(prev.items), pc = cartonsOf(prev.items);
+    if (u.declaredValue == null && prev.declaredValue != null && pv != null && Math.abs(prev.declaredValue - pv) < 0.005) draft.derived.declaredValue = true;
+    if (u.cartons == null && prev.cartons != null && pc != null && prev.cartons === pc) draft.derived.cartons = true;
+  }
+
   for (const op of u.itemOps ?? []) {
     if (op.op === 'add') {
-      const sku = op.sku?.trim() || `ITEM-${draft.items.length + 1}`;
+      const sku = (op.sku && clean(op.sku)) || `ITEM-${draft.items.length + 1}`;
       const existing = draft.items.find((i) => i.sku.toLowerCase() === sku.toLowerCase());
       if (existing) { applyItemFields(existing, op, changes); continue; }
-      const item: Item = { sku, description: op.description?.trim() || '', hsCode: null, quantity: null, unitPrice: null, unitsPerCarton: null, cartons: null, unitWeightKg: null, countryOfOrigin: null };
+      const item: Item = { sku, description: op.description ? clean(op.description) : '', hsCode: null, quantity: null, unitPrice: null, unitsPerCarton: null, cartons: null, unitWeightKg: null, countryOfOrigin: null };
       draft.items.push(item);
       changes.push({ field: `item:${sku}`, label: `Item ${sku}`, from: null, to: `added${item.description ? ` (${item.description})` : ''}` });
       applyItemFields(item, { ...op, description: undefined }, changes, true);
@@ -180,14 +210,17 @@ function applyItemFields(item: Item, op: ItemOp, changes: Change[], quiet = fals
   const log = (what: string, from: unknown, to: unknown) => {
     if (!quiet) changes.push({ field: `item:${item.sku}:${what}`, label: `${item.sku} ${itemLabel[what] ?? what}`, from: fmt(from), to: fmt(to) });
   };
-  if (op.description?.trim() && op.description.trim() !== item.description) { log('description', item.description, op.description.trim()); item.description = op.description.trim(); }
-  if (op.hsCode != null && String(op.hsCode).trim()) { const v = String(op.hsCode).trim(); if (v !== item.hsCode) { log('hsCode', item.hsCode, v); item.hsCode = v; } }
+  const desc = op.description ? clean(op.description) : '';
+  if (desc && desc !== item.description) { log('description', item.description, desc); item.description = desc; }
+  const hs = op.hsCode != null ? clean(String(op.hsCode)) : '';
+  if (hs && hs !== item.hsCode) { log('hsCode', item.hsCode, hs); item.hsCode = hs; }
   for (const k of ['quantity', 'unitPrice', 'unitsPerCarton', 'cartons', 'unitWeightKg'] as const) {
     const v = op[k];
     if (isPos(v) && v !== item[k]) { log(k, item[k], v); item[k] = v; }
   }
-  if (op.countryOfOrigin?.trim()) {
-    const c = canon(op.countryOfOrigin, ITEM_ORIGIN_COUNTRIES) ?? op.countryOfOrigin.trim();
+  if (isPos(op.cartons)) item.cartonsDerived = false; // stated by the seller
+  if (op.countryOfOrigin && clean(op.countryOfOrigin)) {
+    const c = originCountry(op.countryOfOrigin);
     if (c !== item.countryOfOrigin) { log('countryOfOrigin', item.countryOfOrigin, c); item.countryOfOrigin = c; }
   }
 }
@@ -285,6 +318,9 @@ export function templateReply(args: { changes: Change[]; rejected: Rejected[]; m
 
 export function derivedNotes(b: Booking): string[] {
   const n: string[] = [];
+  for (const i of b.items) {
+    if (i.cartonsDerived && b.derived?.cartons) n.push(`${i.description || i.sku}: ${num(i.quantity!)} ÷ ${num(i.unitsPerCarton!)} per carton = ${num(i.cartons!)} cartons — please confirm.`);
+  }
   if (b.derived?.cartons && b.cartons != null) n.push(`I added up the cartons from your items: ${num(b.cartons)} in total — please confirm.`);
   if (b.derived?.declaredValue && b.declaredValue != null) n.push(`I calculated the declared value from your items: ${money(b.declaredValue)} — please confirm.`);
   return n;
