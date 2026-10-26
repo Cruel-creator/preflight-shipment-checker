@@ -31,12 +31,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <div className="util-bar">
-          <div className="mx-auto flex max-w-[75rem] justify-between gap-3 px-5 py-1.5">
-            <span>Pallet freight from the UK to Germany, France and the Netherlands</span>
-            <span className="hidden md:inline">Every booking checked before it ships</span>
-          </div>
-        </div>
         <header className="site-header">
           <div className="mx-auto flex max-w-[75rem] items-center justify-between gap-4 px-5 py-3">
             <Logo />
