@@ -7,7 +7,7 @@ import { recommendCarrier, weightPerPallet } from '@/lib/recommend';
 import type {
   Booking, CheckOptions, CheckResult, Issue, Item, PassedCheck, Recommendation,
 } from '@/lib/types';
-import { dgHsHeading, scanDescription } from './dangerous';
+import { dgHsHeading, scanDescription, statedAbv } from './dangerous';
 
 const EPS = 1e-6;
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -236,7 +236,11 @@ export function ruleR06({ b, opts }: Ctx): RuleOut {
     const reasons: string[] = [];
     if (kw) reasons.push(kw.reason);
     if (hs) reasons.push(`HS code ${it.hsCode} falls under heading ${hs}, which covers batteries.`);
-    if (llm?.isDangerous) reasons.push(`AI description check: ${llm.category ? llm.category + ' — ' : ''}${llm.reason ?? 'looks like dangerous goods'}.`);
+    // Drinks stated at 24% ABV or less (wine, beer, cider) are not dangerous goods; the stated
+    // strength beats an AI guess when nothing else matched.
+    const abv = statedAbv(it.description ?? '');
+    const lowAbvDrink = abv != null && abv <= 24 && !kw && !hs;
+    if (llm?.isDangerous && !lowAbvDrink) reasons.push(`AI description check: ${llm.category ? llm.category + ' — ' : ''}${llm.reason ?? 'looks like dangerous goods'}.`);
     if (!reasons.length) continue;
     issues.push({
       ruleId: 'R-06', severity: 'Red', itemSku: it.sku,

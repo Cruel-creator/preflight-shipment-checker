@@ -190,6 +190,14 @@ describe('DATA checks', () => {
     expect(i.howToFix[0]).toContain('Frankfurt');
     expect(ids(bk001({ destinationCity: 'Munich' }))).not.toContain('DATA-01');
   });
+  it('an AI dangerous-goods guess does not override a stated low alcohol strength', () => {
+    const wine = { sku: 'WIN-75', description: 'Red wine 75cl, 13.5% vol', hsCode: '220421', quantity: 120, unitPrice: 8, unitsPerCarton: 6, cartons: 20, unitWeightKg: 1.3, countryOfOrigin: 'Germany' };
+    const llmDangerous = { 'WIN-75': { isDangerous: true, category: 'Flammable liquid', reason: 'Contains alcohol' } };
+    const b = bk001({ items: [wine], cartons: 20, declaredValue: 960, grossWeightKg: 250 });
+    expect(runChecks(b, { today: TODAY, llmDangerous }).issues.map((x) => x.ruleId)).not.toContain('R-06');
+    const whisky = { ...wine, sku: 'WSK-70', description: 'Single malt whisky 70cl, 40% ABV' };
+    expect(runChecks(bk001({ items: [whisky], cartons: 20, declaredValue: 960, grossWeightKg: 250 }), { today: TODAY }).issues.map((x) => x.ruleId)).toContain('R-06');
+  });
   it('a typed priority outside the four is flagged, not a crash', () => {
     const c = run(bk001({ priority: 'ASAP' as never }));
     expect(c.issues.map((x) => x.ruleId)).toContain('DATA-02');

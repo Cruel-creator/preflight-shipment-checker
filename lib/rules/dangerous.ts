@@ -49,6 +49,12 @@ export function scanDescription(description: string): DgHit | null {
   return null;
 }
 
+/** Alcohol strength stated in a description ("13.5% vol", "40% ABV"), or null. */
+export function statedAbv(description: string): number | null {
+  const m = description.toLowerCase().match(/(\d+(?:\.\d+)?)\s*%\s*(abv|vol|alc)/);
+  return m ? Number(m[1]) : null;
+}
+
 /** HS headings 8506 (primary cells/batteries) and 8507 (accumulators, incl. lithium-ion). */
 export function dgHsHeading(hs: string | null): string | null {
   if (!hs) return null;
