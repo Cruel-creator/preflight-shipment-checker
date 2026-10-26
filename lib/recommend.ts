@@ -1,4 +1,4 @@
-import { BALANCED_WEIGHTS, CARRIERS } from '@/lib/data/reference';
+import { BALANCED_WEIGHTS, CARRIERS, PRIORITIES } from '@/lib/data/reference';
 import { addDays, isValidIso } from '@/lib/dates';
 import { kg, kgPlain, money } from '@/lib/format';
 import type { Booking, CarrierEvaluation, Priority, Recommendation } from '@/lib/types';
@@ -101,6 +101,10 @@ export function recommendCarrier(b: Booking): Recommendation {
   }
   if (!priority) {
     return { ...empty, reason: 'No seller priority chosen yet, so no carrier can be recommended.' };
+  }
+  // A typed value outside the four (e.g. "ASAP") is flagged as DATA-02; ranking needs one of the four.
+  if (!(PRIORITIES as readonly string[]).includes(priority)) {
+    return { ...empty, reason: `Seller priority "${priority}" is not one of ${PRIORITIES.join(', ')}, so no carrier can be recommended.` };
   }
 
   const feasible = carriers.filter((c) => c.feasible);

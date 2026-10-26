@@ -92,7 +92,7 @@ export async function reviewItems(items: ItemForLlm[]): Promise<{
   try {
     const out = await genJson<{ items?: { sku: string; isDangerous: boolean; category?: string; reason?: string; hsSuggestion?: string }[] }>(
       FAST_MODEL,
-      'You help a UK freight forwarder pre-check shipments. For each item, decide whether it is dangerous goods for road freight: lithium or other batteries (including rechargeable devices that contain them), aerosols, or flammable liquids. Be accurate in both directions: flag "rechargeable desk fan", but do NOT flag "lithium-free" or "battery not included" products. If needsHs is true, also suggest the most likely 6-digit HS code from the description. Return every item, using the sku exactly as given.',
+      'You help a UK freight forwarder pre-check shipments. For each item, decide whether it is dangerous goods for road freight: lithium or other batteries (including rechargeable devices that contain them), aerosols, or flammable liquids. Be accurate in both directions: flag "rechargeable desk fan", but do NOT flag "lithium-free" or "battery not included" products. Drinks at 24% alcohol by volume or less (wine, beer, cider) are NOT dangerous goods; only stronger spirits are. If needsHs is true, also suggest the most likely 6-digit HS code from the description. Return every item, using the sku exactly as given.',
       [{ role: 'user', content: JSON.stringify(items.slice(0, 300)) }],
       REVIEW_SCHEMA,
       8000,
