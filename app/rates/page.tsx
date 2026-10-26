@@ -103,7 +103,7 @@ export default function RatesPage() {
   const status = !res ? null : red.length ? ['tone-red', '🔴 Blocked — fix before shipping'] : amber.length ? ['tone-amber', '🟠 Ready with warnings'] : ['tone-green', '✅ Ready to ship'];
 
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <div>
         <h1 className="font-display text-3xl font-bold tracking-tight">Any shipment — live carrier rates</h1>
         <p className="text-sm text-muted">Price a parcel between any two addresses worldwide with live carrier rates from Shippo. Prices and declared values are in the currency of the country you ship from, and checks follow that country&apos;s export rules. This is separate from the UK→EU pallet booking checker, which keeps its own fixed rate card and rulebook. Parcels only (up to 70 kg).</p>
